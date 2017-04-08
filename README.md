@@ -42,7 +42,7 @@ IP Geo-Location database is uses [CZ88.NET](http://www.cz88.net) database, which
 IP to ASN uses the public service provided by [IPtoASN.com](https://iptoasn.com/), which is serviced under [BSD 2-Clause License](https://github.com/jedisct1/iptoasn-webservice/blob/master/LICENSE). It provided public convert service and offline databases. And here is [Github repo](https://github.com/jedisct1/iptoasn-webservice).
 
 ### MoeArt Development Team
-Github: https://github.com/moeart
-Developer Home: http://lab.acgdraw.com
-Official Website: http://www.acgdraw.com
+Github: https://github.com/moeart    
+Developer Home: http://lab.acgdraw.com    
+Official Website: http://www.acgdraw.com    
 
