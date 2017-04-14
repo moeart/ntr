@@ -148,7 +148,8 @@ namespace MoeTraceroute
                     if (IPAddress.TryParse(NtrResultList[Num].Host, out _) )
                         try
                         {
-                            NtrResultList[Num].Geo = QQWry.Query(NtrResultList[Num].Host).Country;
+                            var Location = QQWry.Query(NtrResultList[Num].Host);
+                            NtrResultList[Num].Geo = Location.Country + " " + Location.Local;
                         }
                         catch
                         { }
