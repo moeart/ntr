@@ -40,7 +40,11 @@ namespace MoeTraceroute.Utility
               [a-z]{2}         # Either any 2 char country code,
             | AERO|ARPA|ASIA|BIZ|CAT|COM|COOP|EDU|  # or TLD 
               GOV|INFO|INT|JOBS|MIL|MOBI|MUSEUM|    # from list.
-              NAME|NET|ORG|POST|PRO|TEL|TRAVEL|XXX  # IANA.ORG
+              NAME|NET|ORG|POST|PRO|TEL|TRAVEL|XXX| # IANA.ORG
+              AAA|ABC|ALIBABA|ALIPAY|ANQUAN|AWS|
+              AZURE|BID|CLICK|CLUB|LIVE|LTD|MOE|
+              ONLINE|PRO|PUB|RED|REN|SHOP|SITE|
+              STORE|TECH|TOP|WANG|WIKI|WIN|XIN|XYZ
             )                  # End group of TLD alternatives.
             $                  # Anchor to end of string.",
             RegexOptions.IgnoreCase | RegexOptions.IgnorePatternWhitespace))
