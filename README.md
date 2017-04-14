@@ -13,7 +13,7 @@ NTR is a useful tool to help network engineer diagnose network problem. NTR can 
 You can download at ```Releases``` page: https://github.com/moeart/ntr/releases/latest
 
 # Screenshot
-![tracert_to_acgdraw](http://chuantu.biz/t5/60/1491656539x2890174412.png)
+![tracert_to_acgdraw](http://chuantu.biz/t5/64/1492141534x1822613050.jpg)
 
 # Quick Start
 ### Simplest Way
