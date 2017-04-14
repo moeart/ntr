@@ -18,6 +18,7 @@ namespace MoeTraceroute
         public static int Interval { set; get; } = 1000;
         public static int MaxHop { set; get; } = 30;
         public static bool EnableASN { set; get; } = false;
+        public static bool DomainCheck { set; get; } = true;
 
         private static NtrIcmp Trace = new NtrIcmp();
         private static List<NtrResultItem> NtrResultList = new List<NtrResultItem>();
@@ -30,6 +31,20 @@ namespace MoeTraceroute
         static void Main(string[] args)
         {
             var options = new Option();
+
+            // Parser options via CommandLinePaser
+            if (CommandLine.Parser.Default.ParseArguments(args, options))
+            {
+                Timeout = options.Timeout * 1000;
+                Interval = options.Interval * 1000;
+                MaxHop = options.MaxHop;
+                EnableASN = options.EnableASN;
+                DomainCheck = options.DomainCheck;
+            }
+            else
+            {
+                return; // if invalid option, end application
+            }
 
             // Parser the first parameter is IP or Domain
             if (args.Count() <= 0) // LESS ONE PARAMETER
@@ -44,19 +59,6 @@ namespace MoeTraceroute
                 Console.WriteLine("ERROR: {0} is unknown IP address or domain.\n", args[0]);
                 Console.WriteLine(options.GetUsage());
                 return;
-            }
-            
-            // Then parser options via CommandLinePaser
-            if (CommandLine.Parser.Default.ParseArguments(args, options))
-            {
-                Timeout = options.Timeout * 1000;
-                Interval = options.Interval * 1000;
-                MaxHop = options.MaxHop;
-                EnableASN = options.EnableASN;
-            }
-            else
-            {
-                return; // if invalid option, end application
             }
 
             try // to load ip location database

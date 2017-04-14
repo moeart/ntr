@@ -22,6 +22,10 @@ namespace MoeTraceroute.Utility
 
         public static bool IsValidDomainName(string name)
         {
+            // If Domain check is disabled always pass check
+            if (Program.DomainCheck == false)
+                return true;
+
             if (Regex.IsMatch(name, @" # Rev:2013-03-26
             # Match DNS host domain having one or more subdomains.
             # Top level domain subset taken from IANA.ORG. See:
