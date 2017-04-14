@@ -13,7 +13,7 @@ namespace MoeTraceroute.Utility
           HelpText = "Seconds between each traceroute.")]
         public int Interval { get; set; }
 
-        [Option('m', "max-hop", DefaultValue = 30,
+        [Option('m', "max-hop", DefaultValue = 25,
           HelpText = "How many hops try to find. (min:1, max:255)")]
         public int MaxHop { get; set; }
 
