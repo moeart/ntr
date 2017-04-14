@@ -21,8 +21,8 @@ namespace MoeTraceroute.Utility
           HelpText = "Enable IP to AS number query.")]
         public bool EnableASN { get; set; }
 
-        [Option('d', "domain-check", DefaultValue = true,
-          HelpText = "Disable Check Domain Available")]
+        [Option('d', "unverify-tld", DefaultValue = false,
+          HelpText = "Disable Domain Available Verification.")]
         public bool DomainCheck { get; set; }
 
         [ParserState]

@@ -23,7 +23,7 @@ namespace MoeTraceroute.Utility
         public static bool IsValidDomainName(string name)
         {
             // If Domain check is disabled always pass check
-            if (Program.DomainCheck == false)
+            if (Program.DomainCheck)
                 return true;
 
             if (Regex.IsMatch(name, @" # Rev:2013-03-26
