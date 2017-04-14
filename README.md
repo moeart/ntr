@@ -26,6 +26,11 @@ C:\> ntr www.acgdraw.com
 C:\> ntr www.acgdraw.com -b
 ```
 
+### Disable Domain Verification
+```batch
+C:\> ntr 萌绘图站.二次元 -d
+```
+
 ### Other Options
 ```
 Ntr (MoeArt's Network Traceroute) 1.0.0.0
@@ -33,8 +38,9 @@ Copyright (c) 2017 MoeArt OpenSource Project
 
   -t, --timeout       (Default: 5) Stop waiting router response in seconds.
   -i, --interval      (Default: 1) Seconds between each traceroute.
-  -m, --max-hop       (Default: 30) How many hops try to find. (min:1, max:255)
+  -m, --max-hop       (Default: 25) How many hops try to find. (min:1, max:255)
   -b, --enable-asn    (Default: False) Enable IP to AS number query.
+  -d, --unverify-tld  (Default: False) Disable Domain Available Verification.
   
   --help              Display this help screen.
 
@@ -51,4 +57,3 @@ IP to ASN uses the public service provided by [IPtoASN.com](https://iptoasn.com/
 Github: https://github.com/moeart    
 Developer Home: http://lab.acgdraw.com    
 Official Website: http://www.acgdraw.com    
-
