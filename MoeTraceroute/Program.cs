@@ -171,7 +171,7 @@ namespace MoeTraceroute
             int MaxLength = Console.WindowWidth - 1;
 
             // Print Tool Information
-            string ToolName = "NTR - MoeArt's Netowrk Traceroute";
+            string ToolName = "NTR - MoeArt's Network Traceroute";
             string ToolCopyright = "(c)2017 MoeArt OpenSource, www.acgdraw.com";
             ConsoleHelper.WriteCenter(ToolName, MaxLength);
             ConsoleHelper.WriteCenter(ToolCopyright, MaxLength);

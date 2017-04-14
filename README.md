@@ -33,7 +33,7 @@ C:\> ntr 萌绘图站.二次元 -d
 
 ### Other Options
 ```
-Ntr (MoeArt's Network Traceroute) 1.0.0.0
+Ntr (MoeArt's Network Traceroute)
 Copyright (c) 2017 MoeArt OpenSource Project
 
   -t, --timeout       (Default: 5) Stop waiting router response in seconds.
