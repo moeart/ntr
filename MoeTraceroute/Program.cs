@@ -100,7 +100,7 @@ namespace MoeTraceroute
             // Display Timer
             System.Timers.Timer DisplayTimer = new System.Timers.Timer();
             DisplayTimer.Elapsed += new ElapsedEventHandler(Display);
-            DisplayTimer.Interval = 1000;
+            DisplayTimer.Interval = Interval;
             DisplayTimer.Enabled = true;
 
             //Console.ReadLine();
