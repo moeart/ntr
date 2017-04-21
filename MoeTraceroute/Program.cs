@@ -15,7 +15,7 @@ namespace MoeTraceroute
     {
         // Default Options
         public static int Timeout { set; get; } = 5000;
-        public static int Interval { set; get; } = 2000;
+        public static int Interval { set; get; } = 1000;
         public static int MaxHop { set; get; } = 25;
         public static bool EnableASN { set; get; } = false;
         public static bool DomainCheck { set; get; } = true;

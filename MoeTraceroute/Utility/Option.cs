@@ -9,7 +9,7 @@ namespace MoeTraceroute.Utility
           HelpText = "Stop waiting router response in seconds. (min:1)")]
         public int Timeout { get; set; }
 
-        [Option('i', "interval", DefaultValue = 2,
+        [Option('i', "interval", DefaultValue = 1,
           HelpText = "Seconds between each traceroute. (min:1)")]
         public int Interval { get; set; }
 
