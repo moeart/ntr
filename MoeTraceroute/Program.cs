@@ -25,6 +25,7 @@ namespace MoeTraceroute
         private static readonly DateTime NTR_STARTTIME = DateTime.Now;
         private static readonly int NTR_TIMEDOUT = -1;
         private static string NTR_HOSTNAME = "";
+        private static long NTR_1HOPCOUNT = 0; // Slow down Hop 1 Speed
 
         private static QQWryLocator QQWry;
         private static string BgpQueryServer = "http://api.iptoasn.com/v1/as/ip/";
@@ -124,8 +125,14 @@ namespace MoeTraceroute
                 // Must store value in here, if not will cause incorrect value
                 int Num = i;
                 int Hop = Num + 1;
+
                 new Thread(() =>
                 {
+                    // Slow down First Hop Speed
+                    // BECAUSE: some router block fast icmp requestion.
+                    if (Hop == 1 && NTR_1HOPCOUNT++ % 2 != 0)
+                        return;
+
                     string NewHost = Trace.GetRouterIpByHop(Hop);
                     NtrResultList[Num].Hop = Hop;
 
@@ -200,7 +207,7 @@ namespace MoeTraceroute
             ConsoleHelper.WriteCenter(ToolCopyright, MaxLength);
 
             string InfoLeft = $"Dest: {NTR_HOSTNAME}";
-            string InfoRight = NTR_STARTTIME.ToShortDateString() + " " + NTR_STARTTIME.ToLongTimeString();
+            string InfoRight = "ST: " + NTR_STARTTIME.ToShortDateString() + " " + NTR_STARTTIME.ToLongTimeString();
             Console.WriteLine("{0}{1}", InfoLeft, InfoRight.PadLeft(MaxLength - InfoLeft.Length));
 
             // Print Title Bar
