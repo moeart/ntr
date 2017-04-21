@@ -142,7 +142,20 @@ namespace MoeTraceroute
                         NtrResultList[Num].Best = LastPing;
                     if (LastPing > WrstPing) // Worst
                         NtrResultList[Num].Wrst = LastPing;
-                    NtrResultList[Num].Avg = (BestPing + LastPing) / 2;
+                    
+                    // Average Rtt count
+                    if (LastPing > NTR_TIMEDOUT)
+                        if (NtrResultList[Num].Rtts.Count < 128)
+                        {
+                            NtrResultList[Num].Rtts.Add(LastPing);
+                        }
+                        else
+                        {
+                            NtrResultList[Num].Rtts.RemoveAt(0); // remove first
+                            NtrResultList[Num].Rtts.Add(LastPing);
+                        }
+                    if (NtrResultList[Num].Rtts.Count > 0)
+                        NtrResultList[Num].Avg = Convert.ToInt32(NtrResultList[Num].Rtts.Average());
 
                     // Packets sent and loss count
                     if (LastPing == NTR_TIMEDOUT) // Count Lost Ping
