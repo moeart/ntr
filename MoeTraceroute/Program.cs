@@ -46,6 +46,13 @@ namespace MoeTraceroute
                 return; // if invalid option, end application
             }
 
+            // Timeout or Interval MUST greater than 0
+            if (Timeout == 0 || Interval == 0)
+            {
+                Console.WriteLine(options.GetUsage());
+                return;
+            }
+
             // Parser the first parameter is IP or Domain
             if (args.Count() <= 0) // LESS ONE PARAMETER
             {

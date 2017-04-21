@@ -6,11 +6,11 @@ namespace MoeTraceroute.Utility
     class Option
     {
         [Option('t', "timeout", DefaultValue = 5,
-          HelpText = "Stop waiting router response in seconds.")]
+          HelpText = "Stop waiting router response in seconds. (min:1)")]
         public int Timeout { get; set; }
 
         [Option('i', "interval", DefaultValue = 2,
-          HelpText = "Seconds between each traceroute.")]
+          HelpText = "Seconds between each traceroute. (min:1)")]
         public int Interval { get; set; }
 
         [Option('m', "max-hop", DefaultValue = 25,
