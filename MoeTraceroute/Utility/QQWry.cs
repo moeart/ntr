@@ -128,7 +128,11 @@ namespace QQWry
             {
                 string local;
                 ipLocation.Country = GetCountry(endIpOff, countryFlag, out local);
-                ipLocation.Local = local;
+                // 优化读取
+                if (Regex.IsMatch(local, @"(?i)(CZ88|对方|同一)"))
+                    ipLocation.Local = "";
+                else
+                    ipLocation.Local = local;
             }
             else
             {
