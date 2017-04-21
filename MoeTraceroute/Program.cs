@@ -22,7 +22,9 @@ namespace MoeTraceroute
 
         private static NtrIcmp Trace = new NtrIcmp();
         private static List<NtrResultItem> NtrResultList = new List<NtrResultItem>();
+        private static readonly DateTime NTR_STARTTIME = DateTime.Now;
         private static readonly int NTR_TIMEDOUT = -1;
+        private static string NTR_HOSTNAME = "";
 
         private static QQWryLocator QQWry;
         private static string BgpQueryServer = "http://api.iptoasn.com/v1/as/ip/";
@@ -67,6 +69,7 @@ namespace MoeTraceroute
                 Console.WriteLine(options.GetUsage());
                 return;
             }
+            NTR_HOSTNAME = args[0]; // save hostname
 
             try // to load ip location database
             {
@@ -80,17 +83,17 @@ namespace MoeTraceroute
             // SetUp Tracer
             var NtrResult = new NtrResultItem[MaxHop];
             Trace.Timeout = Timeout;
-            if (ConsoleHelper.IsValidDomainName(args[0]))
+            if (ConsoleHelper.IsValidDomainName(NTR_HOSTNAME))
                 try {
-                    Trace.HostName = Dns.GetHostAddresses(args[0])[0].ToString();
+                    Trace.HostName = Dns.GetHostAddresses(NTR_HOSTNAME)[0].ToString();
                 }
                 catch
                 {
-                    Console.WriteLine($"ERROR: cannot resolve domain '{args[0]}' to IP address!\n");
+                    Console.WriteLine($"ERROR: cannot resolve domain '{NTR_HOSTNAME}' to IP address!\n");
                     return;
                 }
             else
-                Trace.HostName = args[0];
+                Trace.HostName = NTR_HOSTNAME;
 
             // Create a new List used to store results
             for (int i = 0; i < MaxHop; i++)
@@ -186,7 +189,7 @@ namespace MoeTraceroute
 
         private static void Display(object source, ElapsedEventArgs e)
         {
-            Console.Title = $"Ntr {Trace.HostName}  -  MoeArt OpenSource  http://lab.acgdraw.com";
+            Console.Title = $"Ntr {NTR_HOSTNAME}  -  MoeArt OpenSource  http://lab.acgdraw.com";
             Console.Clear();
             int MaxLength = Console.WindowWidth - 1;
 
@@ -195,7 +198,10 @@ namespace MoeTraceroute
             string ToolCopyright = "(c)2017 MoeArt OpenSource, www.acgdraw.com";
             ConsoleHelper.WriteCenter(ToolName, MaxLength);
             ConsoleHelper.WriteCenter(ToolCopyright, MaxLength);
-            Console.WriteLine();
+
+            string InfoLeft = $"Dest: {NTR_HOSTNAME}";
+            string InfoRight = NTR_STARTTIME.ToShortDateString() + " " + NTR_STARTTIME.ToLongTimeString();
+            Console.WriteLine("{0}{1}", InfoLeft, InfoRight.PadLeft(MaxLength - InfoLeft.Length));
 
             // Print Title Bar
             string Format = "{0,3}  {1,-17} {2,5} {3,5} {4,5} {5,5} {6,5} {7,5}  {8,-7} {9}";
