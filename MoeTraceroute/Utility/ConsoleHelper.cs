@@ -86,5 +86,18 @@ namespace MoeTraceroute.Utility
             }
             return false;
         }
+
+        public static bool IsIPv6 (string addr)
+        {
+            IPAddress ip;
+            if (IPAddress.TryParse(addr, out ip))
+            {
+                return ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6;
+            }
+            else
+            {
+                return false;
+            }
+        }
     }
 }

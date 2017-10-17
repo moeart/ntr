@@ -19,6 +19,7 @@ namespace MoeTraceroute
         public static int MaxHop { set; get; } = 25;
         public static bool EnableASN { set; get; } = false;
         public static bool DomainCheck { set; get; } = true;
+        public static bool ipv6 = false;
 
         private static NtrIcmp Trace = new NtrIcmp();
         private static List<NtrResultItem> NtrResultList = new List<NtrResultItem>();
@@ -30,11 +31,15 @@ namespace MoeTraceroute
         private static QQWryLocator QQWry;
         private static string BgpQueryServer = "http://api.iptoasn.com/v1/as/ip/";
         private static NtrAsn AsnHelper = new NtrAsn();
-        
+        private static IP2API Ip2Api = new IP2API();
+
         static void Main(string[] args)
         {
             var options = new Option();
 
+            /*
+             * PARSER OPTIONS
+             */
             // Parser options via CommandLinePaser
             if (CommandLine.Parser.Default.ParseArguments(args, options))
             {
@@ -56,6 +61,11 @@ namespace MoeTraceroute
                 return;
             }
 
+
+
+            /*
+             * DOMAIN OR IP PROCCESS
+             */
             // Parser the first parameter is IP or Domain
             if (args.Count() <= 0) // LESS ONE PARAMETER
             {
@@ -70,13 +80,46 @@ namespace MoeTraceroute
                 Console.WriteLine(options.GetUsage());
                 return;
             }
-            NTR_HOSTNAME = args[0]; // save hostname
 
-            try // to load ip location database
+            // save hostname
+            NTR_HOSTNAME = args[0]; 
+            
+            // resolving ip address
+            string NTR_DESTIPADDR;
+            if (ConsoleHelper.IsValidDomainName(NTR_HOSTNAME))
             {
-                QQWry = new QQWryLocator(AppDomain.CurrentDomain.BaseDirectory + "\\qqwry.dat");
+                try
+                {
+                    NTR_DESTIPADDR = Dns.GetHostAddresses(NTR_HOSTNAME)[0].ToString();
+                }
+                catch
+                {
+                    Console.WriteLine($"ERROR: cannot resolve domain '{NTR_HOSTNAME}' to IP address!\n");
+                    return;
+                }
             }
-            catch { }
+            else
+            {
+                NTR_DESTIPADDR = NTR_HOSTNAME;
+            }
+
+            // is ipv6 or ipv4
+            ipv6 = ConsoleHelper.IsIPv6(NTR_DESTIPADDR);
+
+
+
+            /*
+             * INITIZATION
+             */
+            // to load ip location database when ipv4 only
+            if (ipv6 == false)
+            {
+                try 
+                {
+                    QQWry = new QQWryLocator(AppDomain.CurrentDomain.BaseDirectory + "\\qqwry.dat");
+                }
+                catch { }
+            }
 
             // SetUp ASN Paser
             AsnHelper.BgpQueryServer = BgpQueryServer;
@@ -84,17 +127,7 @@ namespace MoeTraceroute
             // SetUp Tracer
             var NtrResult = new NtrResultItem[MaxHop];
             Trace.Timeout = Timeout;
-            if (ConsoleHelper.IsValidDomainName(NTR_HOSTNAME))
-                try {
-                    Trace.HostName = Dns.GetHostAddresses(NTR_HOSTNAME)[0].ToString();
-                }
-                catch
-                {
-                    Console.WriteLine($"ERROR: cannot resolve domain '{NTR_HOSTNAME}' to IP address!\n");
-                    return;
-                }
-            else
-                Trace.HostName = NTR_HOSTNAME;
+            Trace.HostName = NTR_DESTIPADDR;
 
             // Create a new List used to store results
             for (int i = 0; i < MaxHop; i++)
@@ -175,14 +208,27 @@ namespace MoeTraceroute
                     NtrResultList[Num].Loss = Convert.ToInt32((LossCount / TotalSent) * 100);
 
                     // Try to Get Geo Location
-                    if (IPAddress.TryParse(NtrResultList[Num].Host, out _) )
+                    if (IPAddress.TryParse(NtrResultList[Num].Host, out _))
+                    {
                         try
                         {
-                            var Location = QQWry.Query(NtrResultList[Num].Host);
-                            NtrResultList[Num].Geo = Location.Country + " " + Location.Local;
+                            if (ipv6)
+                            {
+                                if (NtrResultList[Num].Geo == String.Empty)
+                                {
+                                    NtrResultList[Num].Geo = "-";
+                                    NtrResultList[Num].Geo = Ip2Api.Parse(NtrResultList[Num].Host);
+                                }
+                            }
+                            else
+                            {
+                                var Location = QQWry.Query(NtrResultList[Num].Host);
+                                NtrResultList[Num].Geo = Location.Country + " " + Location.Local;
+                            }
                         }
                         catch
                         { }
+                    }
 
                     // Try to Get BGP AS Number
                     if (EnableASN)
@@ -211,7 +257,9 @@ namespace MoeTraceroute
             Console.WriteLine("{0}{1}", InfoLeft, InfoRight.PadLeft(MaxLength - InfoLeft.Length));
 
             // Print Title Bar
-            string Format = "{0,3}  {1,-17} {2,5} {3,5} {4,5} {5,5} {6,5} {7,5}  {8,-7} {9}";
+            string Formatv4 = "{0,3}  {1,-17} {2,5} {3,5} {4,5} {5,5} {6,5} {7,5}  {8,-7} {9}";
+            string Formatv6 = "{0,3}  {1,-40} {2,5} {3,5} {4,5} {5,5} {6,5} {7,5}  {8,-7} {9}";
+            string Format = ipv6 ? Formatv6 : Formatv4;
             string Title = String.Format(Format,
                 "#",
                 "DESTINATION",
