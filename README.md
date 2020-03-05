@@ -6,7 +6,8 @@ NTR is a useful tool to help network engineer diagnose network problem. NTR can 
 * Based on .NET Framework 4.5
 * Do a traceroute via ICMP protocol
 * Convert IP to BGP ASN online
-* Get IP's Geo Location
+* Get IP's Geo Location Offline
+* Get IP's Geo Location Online
 * Console Application in Windows
 
 # Download
@@ -33,17 +34,25 @@ C:\> ntr 萌绘图站.二次元 -d
 
 ### Other Options
 ```
-Ntr (MoeArt's Network Traceroute)
-Copyright (c) 2017 MoeArt OpenSource Project
+Ntr (MoeArt's Network Traceroute) 2.0.2020.305
+Copyright (c) 2020 MoeArt OpenSource Project
 
-  -t, --timeout       (Default: 5) Stop waiting router response in seconds.
-  -i, --interval      (Default: 1) Seconds between each traceroute.
-  -m, --max-hop       (Default: 25) How many hops try to find. (min:1, max:255)
-  -b, --enable-asn    (Default: False) Enable IP to AS number query.
-  -d, --unverify-tld  (Default: False) Disable Domain Available Verification.
-  
-  --help              Display this help screen.
+  -t, --timeout         (Default: 5) Stop waiting router response in seconds.
+                        (min:1)
 
+  -i, --interval        (Default: 1) Seconds between each traceroute. (min:1)
+
+  -m, --max-hop         (Default: 25) How many hops try to find. (min:1,
+                        max:255)
+
+  -b, --enable-asn      (Default: False) Enable IP to BGP AS number query.
+
+  -o, --online-geoip    (Default: False) Use Online GeoIP database instead of
+                        local GeoIP.
+
+  -d, --unverify-tld    (Default: False) Disable Domain Available Verification.
+
+  --help                Display this help screen.
 ```
 
 # License
