@@ -52,6 +52,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Network\IPIPNet.cs" />
     <Compile Include="Network\NtrAsn.cs" />
     <Compile Include="Network\NtrIcmp.cs" />
     <Compile Include="Network\NtrResultItem.cs" />

@@ -18,8 +18,12 @@ namespace MoeTraceroute.Utility
         public int MaxHop { get; set; }
 
         [Option('b', "enable-asn", DefaultValue = false,
-          HelpText = "Enable IP to AS number query.")]
+          HelpText = "Enable IP to BGP AS number query.")]
         public bool EnableASN { get; set; }
+
+        [Option('o', "online-geoip", DefaultValue = false,
+          HelpText = "Use Online GeoIP database instead of local GeoIP.")]
+        public bool UseIPIPGeo { get; set; }
 
         [Option('d', "unverify-tld", DefaultValue = false,
           HelpText = "Disable Domain Available Verification.")]

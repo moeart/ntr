@@ -19,6 +19,7 @@ namespace MoeTraceroute
         public static int MaxHop { set; get; } = 25;
         public static bool EnableASN { set; get; } = false;
         public static bool DomainCheck { set; get; } = true;
+        public static bool UseIPIPGeo { set; get; } = false;
         public static bool ipv6 = false;
 
         private static NtrIcmp Trace = new NtrIcmp();
@@ -32,6 +33,7 @@ namespace MoeTraceroute
         private static string BgpQueryServer = "http://api.iptoasn.com/v1/as/ip/";
         private static NtrAsn AsnHelper = new NtrAsn();
         private static IP2API Ip2Api = new IP2API();
+        private static IPIPNet IPIPNet = new IPIPNet();
 
         static void Main(string[] args)
         {
@@ -47,6 +49,7 @@ namespace MoeTraceroute
                 Interval = options.Interval * 1000;
                 MaxHop = options.MaxHop;
                 EnableASN = options.EnableASN;
+                UseIPIPGeo = options.UseIPIPGeo;
                 DomainCheck = options.DomainCheck;
             }
             else
@@ -220,6 +223,14 @@ namespace MoeTraceroute
                                     NtrResultList[Num].Geo = Ip2Api.Parse(NtrResultList[Num].Host);
                                 }
                             }
+                            if (UseIPIPGeo)
+                            {
+                                if (NtrResultList[Num].Geo == String.Empty)
+                                {
+                                    NtrResultList[Num].Geo = "-";
+                                    NtrResultList[Num].Geo = IPIPNet.Parse(NtrResultList[Num].Host);
+                                }
+                            }
                             else
                             {
                                 var Location = QQWry.Query(NtrResultList[Num].Host);
@@ -248,7 +259,7 @@ namespace MoeTraceroute
 
             // Print Tool Information
             string ToolName = "NTR - MoeArt's Network Traceroute";
-            string ToolCopyright = "(c)2017 MoeArt OpenSource, www.acgdraw.com";
+            string ToolCopyright = "(c)2020 MoeArt OpenSource, www.acgdraw.com";
             ConsoleHelper.WriteCenter(ToolName, MaxLength);
             ConsoleHelper.WriteCenter(ToolCopyright, MaxLength);
 
