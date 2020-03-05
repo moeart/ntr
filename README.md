@@ -6,8 +6,8 @@ NTR is a useful tool to help network engineer diagnose network problem. NTR can 
 * Based on .NET Framework 4.5
 * Do a traceroute via ICMP protocol
 * Convert IP to BGP ASN online
-* Get IP's Geo Location Offline
-* Get IP's Geo Location Online
+* Get IP's Geo Location Offline (chinese only)
+* Get IP's Geo Location Online (chinese, english)
 * Console Application in Windows
 
 # Download
