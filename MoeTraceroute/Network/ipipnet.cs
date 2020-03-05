@@ -43,6 +43,7 @@ namespace MoeTraceroute.Network
                         // replace string
                         GeoRet = (string)token.SelectToken("area");
                         GeoRet = GeoRet.Replace("\t\t", "_ntr_")
+                            .Replace("\t-", "")
                             .Replace("\t", "")
                             .Replace("_ntr_", "  ");
                         GeoRet = Regex.Replace(GeoRet, @"\d*\.\d*", "");
