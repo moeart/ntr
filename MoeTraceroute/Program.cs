@@ -3,7 +3,8 @@ using MoeTraceroute.Utility;
 using QQWry;
 using System;
 using System.Collections.Generic;
-using System.IO;
+using CommandLine;
+using CommandLine.Text;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -30,37 +31,60 @@ namespace MoeTraceroute
         private static long NTR_1HOPCOUNT = 0; // Slow down Hop 1 Speed
 
         private static QQWryLocator QQWry;
-        private static string BgpQueryServer = "http://api.iptoasn.com/v1/as/ip/";
+        //private static string BgpQueryServer = "http://api.iptoasn.com/v1/as/ip/";
+        private static string BgpQueryServer = "https://freeapi.dnslytics.net/v1/ip2asn/";
         private static NtrAsn AsnHelper = new NtrAsn();
         private static IP2API Ip2Api = new IP2API();
         private static IPIPNet IPIPNet = new IPIPNet();
 
+        private static void DisplayHelp(ParserResult<Option> result)
+        {
+            Console.WriteLine(HelpText.AutoBuild(result, h =>
+            {
+                return HelpText.DefaultParsingErrorsHandler(result, h);
+            }, e => e));
+        }
         static void Main(string[] args)
         {
-            var options = new Option();
+            //var options = new Option();
 
             /*
              * PARSER OPTIONS
              */
             // Parser options via CommandLinePaser
-            if (CommandLine.Parser.Default.ParseArguments(args, options))
+            //if (CommandLine.Parser.Default.ParseArguments(args, options))
+            //{
+            //    Timeout = options.Timeout * 1000;
+            //    Interval = options.Interval * 1000;
+            //    MaxHop = options.MaxHop;
+            //    EnableASN = options.EnableASN;
+            //    UseIPIPGeo = options.UseIPIPGeo;
+            //    DomainCheck = options.DomainCheck;
+            //}
+            //else
+            //{
+            //    return; // if invalid option, end application
+            //}
+
+            ParserResult<Option> parse = Parser.Default.ParseArguments<Option>(args);
+
+            parse.WithParsed(options =>
             {
                 Timeout = options.Timeout * 1000;
-                Interval = options.Interval * 1000;
                 MaxHop = options.MaxHop;
                 EnableASN = options.EnableASN;
-                UseIPIPGeo = options.UseIPIPGeo;
+                UseIPIPGeo = false;  // The API has been deprecated
                 DomainCheck = options.DomainCheck;
-            }
-            else
-            {
-                return; // if invalid option, end application
-            }
+            }).WithNotParsed(errs =>
+           {
+               Environment.Exit(0); // if invalid option, end application
+           });
 
             // Timeout or Interval MUST greater than 0
             if (Timeout == 0 || Interval == 0)
             {
-                Console.WriteLine(options.GetUsage());
+                //Console.WriteLine(options.GetUsage());
+                DisplayHelp(parse);
                 return;
             }
 
@@ -72,7 +96,8 @@ namespace MoeTraceroute
             // Parser the first parameter is IP or Domain
             if (args.Count() <= 0) // LESS ONE PARAMETER
             {
-                Console.WriteLine(options.GetUsage());
+                //Console.WriteLine(options.GetUsage());
+                DisplayHelp(parse);
                 return;
             }
             else if (!(ConsoleHelper.IsValidIPAddress(args[0]) // IS IP ADDRESS
@@ -80,13 +105,14 @@ namespace MoeTraceroute
                 ))
             {
                 Console.WriteLine("ERROR: {0} is unknown IP address or domain.\n", args[0]);
-                Console.WriteLine(options.GetUsage());
+                //Console.WriteLine(options.GetUsage());
+                DisplayHelp(parse);
                 return;
             }
 
             // save hostname
-            NTR_HOSTNAME = args[0]; 
-            
+            NTR_HOSTNAME = args[0];
+
             // resolving ip address
             string NTR_DESTIPADDR;
             if (ConsoleHelper.IsValidDomainName(NTR_HOSTNAME))
@@ -117,7 +143,7 @@ namespace MoeTraceroute
             // to load ip location database when ipv4 only
             if (ipv6 == false)
             {
-                try 
+                try
                 {
                     QQWry = new QQWryLocator(AppDomain.CurrentDomain.BaseDirectory + "\\qqwry.dat");
                 }
@@ -188,7 +214,7 @@ namespace MoeTraceroute
                         NtrResultList[Num].Best = LastPing;
                     if (LastPing > WrstPing) // Worst
                         NtrResultList[Num].Wrst = LastPing;
-                    
+
                     // Average Rtt count
                     if (LastPing > NTR_TIMEDOUT)
                         if (NtrResultList[Num].Rtts.Count < 128)
@@ -259,7 +285,7 @@ namespace MoeTraceroute
 
             // Print Tool Information
             string ToolName = "NTR - MoeArt's Network Traceroute";
-            string ToolCopyright = "(c)2020 MoeArt OpenSource, www.acgdraw.com";
+            string ToolCopyright = "(c)2020 - 2024 MoeArt OpenSource, www.acgdraw.com";
             ConsoleHelper.WriteCenter(ToolName, MaxLength);
             ConsoleHelper.WriteCenter(ToolCopyright, MaxLength);
 
@@ -292,7 +318,7 @@ namespace MoeTraceroute
             Console.ResetColor();
 
             // Print Items from Result List
-            for (int i=0; i<NtrResultList.Count(); i++)
+            for (int i = 0; i < NtrResultList.Count(); i++)
             {
                 NtrResultItem Item = NtrResultList[i];
                 string FormattedItem = String.Format(Format,
@@ -306,7 +332,7 @@ namespace MoeTraceroute
                     Item.Wrst == NTR_TIMEDOUT ? "*" : Item.Wrst.ToString(),
                     Item.ASN,
                     Item.Geo).PadRight(MaxLength);
-                Console.WriteLine(ChineseSubStr.GetSubString(FormattedItem,0,MaxLength));
+                Console.WriteLine(ChineseSubStr.GetSubString(FormattedItem, 0, MaxLength));
 
                 // Break at the End, This hop same as Hostname means the End
                 if (Item.Host == Trace.HostName)
@@ -314,7 +340,7 @@ namespace MoeTraceroute
                     MaxHop = i + 1; // Set Max Hop to the End Hop
                     break;          // Break Displaying
                 }
-                
+
             }
 
         }

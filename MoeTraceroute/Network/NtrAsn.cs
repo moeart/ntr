@@ -5,6 +5,7 @@ namespace MoeTraceroute.Network
 {
     class NtrAsn
     {
+        //https://ipinfo.io/widget/demo/
         public string BgpQueryServer { set; get; } = "http://api.iptoasn.com/v1/as/ip/";
         private string BgpAsnList = "www.acgdraw.com,0|lab.acgdraw.com,0"; // Padding Data
 
@@ -31,18 +32,27 @@ namespace MoeTraceroute.Network
                 // If not in list try parse via IPTOASN
                 try
                 {
+                    ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3
+                    //| SecurityProtocolType.SystemDefault //注意：不要加入此行
+                    | SecurityProtocolType.Tls
+                    | SecurityProtocolType.Tls11
+                    | SecurityProtocolType.Tls12;
                     using (WebClient wc = new WebClient())
                     {
+                        
                         var json = wc.DownloadString($"{BgpQueryServer}{Host}");
                         JToken token = JObject.Parse(json);
-                        AsnRet = (string)token.SelectToken("as_number");
+                        //JToken asn = token.SelectToken("asn");
+                        AsnRet = (string)token.SelectToken("asn");
 
                         // Store to local List
                         BgpAsnList += $"|{Host},{AsnRet}";
                     }
                 }
-                catch
-                { }
+                catch (System.Exception e)
+                {
+                    System.Diagnostics.Debug.WriteLine(e.Message);
+                }
             }
 
             return AsnRet;
