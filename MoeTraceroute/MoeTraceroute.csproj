@@ -51,6 +51,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Ip2Asn\ASN.cs" />
+    <Compile Include="Ip2Asn\ASNs.cs" />
+    <Compile Include="Ip2Asn\Ip.cs" />
     <Compile Include="Network\IPIPNet.cs" />
     <Compile Include="Network\NtrAsn.cs" />
     <Compile Include="Network\NtrIcmp.cs" />

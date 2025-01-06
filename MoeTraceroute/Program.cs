@@ -9,6 +9,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Timers;
+using MoeTraceroute.Ip2Asn;
 
 namespace MoeTraceroute
 {
@@ -31,6 +32,7 @@ namespace MoeTraceroute
         private static long NTR_1HOPCOUNT = 0; // Slow down Hop 1 Speed
 
         private static QQWryLocator QQWry;
+        private static ASNs asns;
         //private static string BgpQueryServer = "http://api.iptoasn.com/v1/as/ip/";
         private static string BgpQueryServer = "https://freeapi.dnslytics.net/v1/ip2asn/";
         private static NtrAsn AsnHelper = new NtrAsn();
@@ -149,6 +151,9 @@ namespace MoeTraceroute
                 }
                 catch { }
             }
+
+            // To load local asn database
+            asns = new ASNs(AppDomain.CurrentDomain.BaseDirectory + "\\ip2asn-combined.tsv");
 
             // SetUp ASN Paser
             AsnHelper.BgpQueryServer = BgpQueryServer;
@@ -269,7 +274,16 @@ namespace MoeTraceroute
 
                     // Try to Get BGP AS Number
                     if (EnableASN)
-                        NtrResultList[Num].ASN = AsnHelper.Parse(NtrResultList[Num].Host);
+                    {
+                        if(UseIPIPGeo)
+                        {
+                            NtrResultList[Num].ASN = AsnHelper.Parse(NtrResultList[Num].Host);
+                        }
+                        else
+                        {
+                            NtrResultList[Num].ASN = asns.lookup_by_ip(NtrResultList[Num].Host);
+                        }
+                    }
                     else
                         NtrResultList[Num].ASN = "- -";
                 }).Start();
