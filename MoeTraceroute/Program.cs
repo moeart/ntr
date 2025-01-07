@@ -153,7 +153,12 @@ namespace MoeTraceroute
             }
 
             // To load local asn database
-            asns = new ASNs(AppDomain.CurrentDomain.BaseDirectory + "\\ip2asn-combined.tsv");
+            if (EnableASN)
+            {
+                Console.WriteLine("The ASN database is being initialized; please wait.");
+                asns = new ASNs(AppDomain.CurrentDomain.BaseDirectory + "\\ip2asn-combined.tsv");
+            }
+            
 
             // SetUp ASN Paser
             AsnHelper.BgpQueryServer = BgpQueryServer;
