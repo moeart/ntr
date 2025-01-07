@@ -303,8 +303,8 @@ namespace MoeTraceroute
             int MaxLength = Console.WindowWidth - 1;
 
             // Print Tool Information
-            string ToolName = "NTR - MoeArt's Network Traceroute";
-            string ToolCopyright = "(c)2020 - 2024 MoeArt OpenSource, www.acgdraw.com";
+            string ToolName = "NTR - MoeArt's Network Traceroute - Special Edition for Laba Festival";
+            string ToolCopyright = "(c)2020 - 2025 MoeArt OpenSource, www.acgdraw.com";
             ConsoleHelper.WriteCenter(ToolName, MaxLength);
             ConsoleHelper.WriteCenter(ToolCopyright, MaxLength);
 

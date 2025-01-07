@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("MoeArt Development Team")]
 [assembly: AssemblyProduct("MoeTraceroute")]
-[assembly: AssemblyCopyright("Copyright (c) 2020 - 2024 MoeArt OpenSource Project")]
+[assembly: AssemblyCopyright("Copyright (c) 2020 - 2025 MoeArt OpenSource Project")]
 [assembly: AssemblyTrademark("MoeArt http://www.acgdraw.com")]
 [assembly: AssemblyCulture("")]
 
@@ -32,5 +32,5 @@ using System.Runtime.InteropServices;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("2.0.2024.0105")]
-[assembly: AssemblyFileVersion("2.0.2024.0105")]
+[assembly: AssemblyVersion("3.0.2024.0107")]
+[assembly: AssemblyFileVersion("3.0.2024.0107")]
