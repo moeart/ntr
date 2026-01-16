@@ -44,13 +44,38 @@ type NTR struct {
 }
 
 func NewNTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
-	hopsleep time.Duration, maxHops, maxUnknownHops, ringBufferSize int, ptr bool, enableAsn bool, enableGeoIP bool, lang string, useQQWry bool) (*NTR, chan struct{}, error) {
+	hopsleep time.Duration, maxHops, maxUnknownHops, ringBufferSize int, ptr bool, enableAsn bool, enableGeoIP bool, lang string, useQQWry bool, forceIPv4 bool, forceIPv6 bool) (*NTR, chan struct{}, error) {
 	if net.ParseIP(addr) == nil {
-		addrs, err := net.LookupHost(addr)
-		if err != nil || len(addrs) == 0 {
-			return nil, nil, fmt.Errorf("invalid host or ip provided: %s", err)
+		// 域名解析
+		if forceIPv4 {
+			// 强制解析 IPv4 地址
+			ipAddr, err := net.ResolveIPAddr("ip4", addr)
+			if err != nil {
+				return nil, nil, fmt.Errorf("no IPv4 address found for host: %s", err)
+			}
+			addr = ipAddr.IP.String()
+		} else if forceIPv6 {
+			// 强制解析 IPv6 地址
+			ipAddr, err := net.ResolveIPAddr("ip6", addr)
+			if err != nil {
+				return nil, nil, fmt.Errorf("no IPv6 address found for host: %s", err)
+			}
+			addr = ipAddr.IP.String()
+		} else {
+			// 默认解析行为：IPv6 优先（如果可用）
+			// 先尝试解析 IPv6 地址
+			ipv6Addr, err := net.ResolveIPAddr("ip6", addr)
+			if err == nil {
+				addr = ipv6Addr.IP.String()
+			} else {
+				// IPv6 解析失败，尝试解析 IPv4 地址
+				ipv4Addr, err := net.ResolveIPAddr("ip4", addr)
+				if err != nil {
+					return nil, nil, fmt.Errorf("no valid IP address found for host: %s", err)
+				}
+				addr = ipv4Addr.IP.String()
+			}
 		}
-		addr = addrs[0]
 	}
 	if srcAddr == "" {
 		if net.ParseIP(addr).To4() != nil {

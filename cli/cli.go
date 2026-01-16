@@ -34,6 +34,8 @@ var (
 	ENABLE_GEOIP     = true
 	UPDATE_GEOIP     = false
 	LANG             = "zh" // 默认语言为中文
+	forceIPv4        = false
+	forceIPv6        = false
 )
 
 // rootCmd represents the root command
@@ -83,8 +85,13 @@ var RootCmd = &cobra.Command{
 			useQQWry = false
 		}
 
+		// 验证协议选项
+		if forceIPv4 && forceIPv6 {
+			return fmt.Errorf("cannot use both -4 and -6 options at the same time")
+		}
+
 		m, ch, err := ntr.NewNTR(args[0], srcAddr, TIMEOUT, INTERVAL, HOP_SLEEP,
-			MAX_HOPS, MAX_UNKNOWN_HOPS, RING_BUFFER_SIZE, PTR_LOOKUP, ENABLE_ASN, ENABLE_GEOIP, LANG, useQQWry)
+			MAX_HOPS, MAX_UNKNOWN_HOPS, RING_BUFFER_SIZE, PTR_LOOKUP, ENABLE_ASN, ENABLE_GEOIP, LANG, useQQWry, forceIPv4, forceIPv6)
 		if err != nil {
 			return err
 		}
@@ -183,10 +190,8 @@ func init() {
 
 	RootCmd.Flags().DurationVarP(&INTERVAL, "interval", "i", INTERVAL, "Seconds between each traceroute. (min:1)")
 	// 添加 IPv4 和 IPv6 选项
-	var ipv4 bool
-	RootCmd.Flags().BoolVarP(&ipv4, "ipv4", "4", false, "Force using IPv4 protocol")
-	var ipv6 bool
-	RootCmd.Flags().BoolVarP(&ipv6, "ipv6", "6", false, "Force using IPv6 protocol")
+	RootCmd.Flags().BoolVarP(&forceIPv4, "ipv4", "4", false, "Force using IPv4 protocol")
+	RootCmd.Flags().BoolVarP(&forceIPv6, "ipv6", "6", false, "Force using IPv6 protocol")
 	RootCmd.Flags().BoolVarP(&jsonFmt, "json", "j", jsonFmt, "Print JSON formatted results")
 	RootCmd.Flags().IntVarP(&MAX_HOPS, "max-hop", "m", MAX_HOPS, "Maximum number of hops to try. (min:1, max:255)")
 	RootCmd.Flags().DurationVarP(&TIMEOUT, "timeout", "t", TIMEOUT, "Stop waiting for router response in seconds. (min:1)")
