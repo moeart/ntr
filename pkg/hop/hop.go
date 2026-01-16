@@ -15,6 +15,8 @@ import (
 	"github.com/moeart/ntr/pkg/icmp"
 )
 
+// HopStatistic - Contains statistics and information about a traceroute hop
+
 type HopStatistic struct {
 	Dest           *net.IPAddr
 	Timeout        time.Duration
@@ -35,6 +37,8 @@ type HopStatistic struct {
 	Lang           string
 	UseQQWry       bool
 }
+
+// packet - Represents an ICMP packet result for JSON serialization
 
 type packet struct {
 	Success      bool    `json:"success"`
@@ -133,28 +137,28 @@ func (h *HopStatistic) packets() []*packet {
 	return v
 }
 
-// getStringDisplayWidth 计算字符串的显示宽度，中文字符计为2个宽度，英文字符计为1个宽度
+// getStringDisplayWidth - Calculate string display width, Chinese characters count as 2, English characters count as 1
 func getStringDisplayWidth(s string) int {
 	width := 0
 	for _, r := range s {
 		if r >= 0x4e00 && r <= 0x9fff {
-			// 中文字符占用2个宽度
+			// Chinese characters occupy 2 widths
 			width += 2
 		} else {
-			// 其他字符占用1个宽度
+			// Other characters occupy 1 width
 			width += 1
 		}
 	}
 	return width
 }
 
-// truncateString 安全地截断字符串，避免截断多字节字符，基于显示宽度
+// truncateString - Safely truncate string without breaking multi-byte characters, based on display width
 func truncateString(s string, maxWidth int) string {
 	if getStringDisplayWidth(s) <= maxWidth {
 		return s
 	}
 
-	// 确保不会截断UTF-8字符，基于显示宽度进行截断
+	// Ensure UTF-8 characters are not broken, truncate based on display width
 	var truncated string
 	currentWidth := 0
 	for _, r := range s {
@@ -181,7 +185,7 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 	}
 	maxLength := width - 1
 
-	// 确定列格式，根据 IPv4/IPv6 调整 DESTINATION 列宽度
+	// Determine column format, adjust DESTINATION column width based on IPv4/IPv6
 	var isIPv6 bool
 	if h.Dest != nil && h.Dest.IP != nil {
 		isIPv6 = h.Dest.IP.To4() == nil
@@ -197,7 +201,7 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 		}
 	}
 
-	// 计算其他列宽度
+	// Calculate other column widths
 	lossWidth := 5
 	sentWidth := 5
 	lastWidth := 5
@@ -207,11 +211,11 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 	asnWidth := 7
 	locationWidth := maxLength - 3 - 2 - destWidth - 2 - lossWidth - sentWidth - lastWidth - bestWidth - avgWidth - wrstWidth - 2 - asnWidth - 1
 
-	// 构建格式化字符串
+	// Build format string
 	format := fmt.Sprintf("%%3d  %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds  %%-%ds %%-%ds",
 		destWidth, lossWidth, sentWidth, lastWidth, bestWidth, avgWidth, wrstWidth, asnWidth, locationWidth)
 
-	// 获取目标地址
+	// Get destination address
 	var dest string
 	if h.Targets == nil || len(h.Targets) == 0 || (len(h.Targets) > 0 && h.Targets[0] == "") {
 		dest = "Request timed out"
@@ -219,12 +223,12 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 		dest = h.lookupAddr(ptrLookup, 0)
 	}
 
-	// 安全截断目标地址以适应列宽，避免截断多字节字符
+	// Safely truncate destination address to fit column width, avoid breaking multi-byte characters
 	if getStringDisplayWidth(dest) > destWidth {
 		dest = truncateString(dest, destWidth)
 	}
 
-	// 获取延迟值
+	// Get delay values
 	var last, best, avg, wrst string
 	if !h.Last.Success {
 		last = "*"
@@ -250,7 +254,7 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 		wrst = fmt.Sprintf("%.0f", h.Worst.Elapsed.Seconds()*1000)
 	}
 
-	// 获取 ASN 信息
+	// Get ASN information
 	var asnStr string
 	if h.Asns != nil && h.Targets != nil && len(h.Targets) > 0 && h.Targets[0] != "" {
 		if a, err := h.Asns.LookupByIP(h.Targets[0]); err == nil && a != nil && a.Number != "AS0" {
@@ -262,7 +266,7 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 		asnStr = "- -"
 	}
 
-	// 获取 LOCATION 信息
+	// Get LOCATION information
 	var locationStr string
 	if h.Targets != nil && len(h.Targets) > 0 && h.Targets[0] != "" {
 		if h.GeoIP != nil {
@@ -272,7 +276,7 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 				locationStr = "- -"
 			}
 		} else if h.Asns != nil {
-			// 如果没有 GeoIP，但有 ASN 数据，也尝试获取位置信息
+			// If no GeoIP but have ASN data, also try to get location information
 			if a, err := h.Asns.LookupByIP(h.Targets[0]); err == nil && a != nil && a.Country != "" {
 				parts := []string{a.Country}
 				if a.Description != "" {
@@ -289,12 +293,12 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 		locationStr = "- -"
 	}
 
-	// 安全截断位置信息以适应列宽，避免截断多字节字符
+	// Safely truncate location information to fit column width, avoid breaking multi-byte characters
 	if getStringDisplayWidth(locationStr) > locationWidth {
 		locationStr = truncateString(locationStr, locationWidth)
 	}
 
-	// 构建行内容
+	// Build row content
 	line := fmt.Sprintf(format,
 		h.TTL,
 		dest,
@@ -304,11 +308,11 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 		best,
 		avg,
 		wrst,
-		asnStr,      // ASN 列
-		locationStr, // LOCATION 列
+		asnStr,      // ASN column
+		locationStr, // LOCATION column
 	)
 
-	// 确保行内容不超过终端宽度，使用安全截断
+	// Ensure line content does not exceed terminal width, use safe truncation
 	if getStringDisplayWidth(line) > maxLength {
 		line = truncateString(line, maxLength)
 	}

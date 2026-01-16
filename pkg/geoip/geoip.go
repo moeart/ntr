@@ -16,25 +16,24 @@ import (
 )
 
 const (
-	// GeoIPURL 是获取 IP 到地理位置数据的官方数据源
+	// GeoIPURL - Official source for IP to geolocation data
 	GeoIPURL = "https://github.com/metowolf/qqwry.dat/releases/latest/download/qqwry.dat"
-	// BinaryDatabaseFile 是编译后的二进制数据库文件名
+	// BinaryDatabaseFile - Compiled binary database filename
 	BinaryDatabaseFile = "data/geoip.bin"
 )
 
-// GeoIP 封装 qqwry 库并提供查询功能
+// GeoIP - Encapsulates qqwry library and provides lookup functionality
 type GeoIP struct {
 	initialized bool
 }
 
-// NewGeoIP 创建新的 GeoIP 实例并加载数据库
+// NewGeoIP - Create new GeoIP instance and load database
 func NewGeoIP() (*GeoIP, error) {
 	geoip := &GeoIP{}
 
 	filePath := GetBinaryDatabasePath()
 	err := qqwry.LoadFile(filePath)
 	if err == nil {
-
 		geoip.initialized = true
 		return geoip, nil
 	}
@@ -43,17 +42,17 @@ func NewGeoIP() (*GeoIP, error) {
 	return geoip, nil
 }
 
-// UpdateGeoIPDatabase 从 metowolf/qqwry.dat 下载最新的 GeoIP 数据库
+// UpdateGeoIPDatabase - Download latest GeoIP database from metowolf/qqwry.dat
 func UpdateGeoIPDatabase() error {
 	log.Println("Starting GeoIP database update from server ...")
 
-	// 确保 data 目录存在
+	// Ensure data directory exists
 	if err := os.MkdirAll("data", 0755); err != nil {
 		return fmt.Errorf("failed to create data directory: %v", err)
 	}
 
-	// 下载数据库文件
-	log.Println("Downloading ASN database ...")
+	// Download database file
+	log.Println("Downloading GeoIP database ...")
 	if err := downloadFileWithProgress(GetBinaryDatabasePath(), GeoIPURL); err != nil {
 		return fmt.Errorf("failed to download GeoIP database: %v", err)
 	}
@@ -62,7 +61,7 @@ func UpdateGeoIPDatabase() error {
 	return nil
 }
 
-// isSpecialIP 检查是否是特殊IP地址并返回对应Location
+// isSpecialIP - Check if IP is special and return corresponding Location
 func isSpecialIP(ipStr string, lang string) *Location {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
@@ -76,7 +75,7 @@ func isSpecialIP(ipStr string, lang string) *Location {
 
 	b1, b2, b3, b4 := ip4[0], ip4[1], ip4[2], ip4[3]
 
-	// 127.*.*.* 显示为本机环回地址
+	// 127.*.*.* - Loopback address
 	if b1 == 127 {
 		if lang == "en" {
 			return &Location{Country: "Loopback Address"}
@@ -84,7 +83,7 @@ func isSpecialIP(ipStr string, lang string) *Location {
 		return &Location{Country: "本机环回地址"}
 	}
 
-	// 10.*.*.* 显示为本地局域网
+	// 10.*.*.* - Local Area Network (A-class)
 	if b1 == 10 {
 		if lang == "en" {
 			return &Location{Country: "Local Area Network (A-class)"}
@@ -92,7 +91,7 @@ func isSpecialIP(ipStr string, lang string) *Location {
 		return &Location{Country: "本地局域网"}
 	}
 
-	// 172.16.*.* 到 172.31.*.*（整个B类）显示为本地局域网
+	// 172.16.*.* to 172.31.*.* - Local Area Network (B-class)
 	if b1 == 172 && (b2 >= 16 && b2 <= 31) {
 		if lang == "en" {
 			return &Location{Country: "Local Area Network (B-class)"}
@@ -100,9 +99,9 @@ func isSpecialIP(ipStr string, lang string) *Location {
 		return &Location{Country: "本地局域网"}
 	}
 
-	// 192.168.*.* 显示为本地局域网
+	// 192.168.*.* - Local Area Network (C-class)
 	if b1 == 192 && b2 == 168 {
-		// 192.168.1-255.1 显示为本地局域网网关
+		// 192.168.1-255.1 - Local Area Network Gateway
 		if b4 == 1 && b3 >= 1 && b3 <= 255 {
 			if lang == "en" {
 				return &Location{Country: "Local Area Network Gateway"}
@@ -115,7 +114,7 @@ func isSpecialIP(ipStr string, lang string) *Location {
 		return &Location{Country: "本地局域网"}
 	}
 
-	// 169.254.*.* 显示为零配置局域网
+	// 169.254.*.* - Zero-Configuration Local Area Network
 	if b1 == 169 && b2 == 254 {
 		if lang == "en" {
 			return &Location{Country: "Zero-Configuration Local Area Network"}
@@ -123,7 +122,7 @@ func isSpecialIP(ipStr string, lang string) *Location {
 		return &Location{Country: "零配置局域网"}
 	}
 
-	// 11.*.*.* 显示为IDC机房内网
+	// 11.*.*.* - IDC Intranet
 	if b1 == 11 {
 		if lang == "en" {
 			return &Location{Country: "IDC Intranet"}
@@ -131,7 +130,7 @@ func isSpecialIP(ipStr string, lang string) *Location {
 		return &Location{Country: "IDC机房内网"}
 	}
 
-	// 134.128-255.*.* 显示为中国电信 DCN内网
+	// 134.128-255.*.* - China Telecom DCN Intranet
 	if b1 == 134 && (b2 >= 128 && b2 <= 255) {
 		if lang == "en" {
 			return &Location{Country: "China Telecom DCN Intranet"}
@@ -139,7 +138,7 @@ func isSpecialIP(ipStr string, lang string) *Location {
 		return &Location{Country: "中国电信 DCN内网"}
 	}
 
-	// 220.110-111.*.* 显示为萌信通 DCN内网
+	// 220.110-111.*.* - Mengxintong DCN Intranet
 	if b1 == 220 && (b2 == 110 || b2 == 111) {
 		if lang == "en" {
 			return &Location{Country: "Mengxintong DCN Intranet"}
@@ -147,7 +146,7 @@ func isSpecialIP(ipStr string, lang string) *Location {
 		return &Location{Country: "萌信通 DCN内网"}
 	}
 
-	// 100.64-127.*.* 显示为运营商CGNAT内网
+	// 100.64-127.*.* - Carrier CGNAT Intranet
 	if b1 == 100 && (b2 >= 64 && b2 <= 127) {
 		if lang == "en" {
 			return &Location{Country: "Carrier CGNAT Intranet"}
@@ -158,15 +157,15 @@ func isSpecialIP(ipStr string, lang string) *Location {
 	return nil
 }
 
-// LookupByIP 查询IP地址信息
+// LookupByIP - Lookup IP address information
 func (g *GeoIP) LookupByIP(ipStr string, lang string, useQQWry bool, asns *asn.ASNs) (*Location, error) {
-	// 首先检查是否是特殊IP地址
+	// First check if it's a special IP address
 	specialLoc := isSpecialIP(ipStr, lang)
 	if specialLoc != nil {
 		return specialLoc, nil
 	}
 
-	// 根据条件决定是否使用QQWry查询
+	// Determine whether to use QQWry based on conditions
 	if useQQWry && g.initialized {
 		location, err := qqwry.QueryIP(ipStr)
 		if err == nil {
@@ -180,11 +179,11 @@ func (g *GeoIP) LookupByIP(ipStr string, lang string, useQQWry bool, asns *asn.A
 		}
 	}
 
-	// 如果无法使用QQWry数据库，尝试从ASN数据中获取信息
+	// If QQWry database is unavailable, try to get information from ASN data
 	if asns != nil {
 		if a, err := asns.LookupByIP(ipStr); err == nil && a != nil {
-			// 从ASN数据中提取国家代码和描述信息
-			// ASN的Country字段通常是2字母的国家代码，Description字段包含ISP信息
+			// Extract country code and description from ASN data
+			// ASN's Country field is usually 2-letter country code, Description contains ISP info
 			return &Location{
 				Country: a.Country,
 				ISP:     a.Description,
@@ -195,7 +194,7 @@ func (g *GeoIP) LookupByIP(ipStr string, lang string, useQQWry bool, asns *asn.A
 	return &Location{Country: "N/A"}, nil
 }
 
-// Location 表示地理位置信息
+// Location - Represents geographical location information
 type Location struct {
 	Country  string
 	Province string
@@ -204,11 +203,11 @@ type Location struct {
 	ISP      string
 }
 
-// Format 格式化输出
+// Format - Format location for display
 func (l *Location) Format(lang string) string {
 	var parts []string
 
-	// 检查是否是特殊IP地址（这些地址的Country字段包含了完整的描述）
+	// Check if it's a special IP address (Country field contains complete description)
 	specialCases := []string{"本地局域网", "本地局域网网关", "零配置局域网", "本机环回地址", "IDC机房内网", "中国电信 DCN内网", "萌信通 DCN内网", "运营商CGNAT内网"}
 	if lang == "en" {
 		specialCases = []string{"Local Area Network", "Loopback Address", "Zero-Configuration Local Area Network", "IDC Intranet", "China Telecom DCN Intranet", "Mengxintong DCN Intranet", "Carrier CGNAT Intranet"}
@@ -220,7 +219,7 @@ func (l *Location) Format(lang string) string {
 		}
 	}
 
-	// 如果是从ASN获取的数据（通常Country是2字母代码，Province/City为空）
+	// If data is from ASN (usually 2-letter country code, Province/City empty)
 	if l.Country != "" && l.Province == "" && l.City == "" && l.District == "" {
 		if l.Country != "N/A" {
 			parts = append(parts, l.Country)
@@ -229,7 +228,7 @@ func (l *Location) Format(lang string) string {
 			parts = append(parts, l.ISP)
 		}
 	} else {
-		// 中国范围内不显示国家
+		// For China, don't display country name
 		if l.Country == "中国" {
 			if l.Province != "" {
 				parts = append(parts, l.Province)
@@ -260,7 +259,7 @@ func (l *Location) Format(lang string) string {
 		}
 	}
 
-	// 如果没有任何信息，返回 N/A
+	// If no information available, return N/A
 	if len(parts) == 0 {
 		return "N/A"
 	}
@@ -268,7 +267,7 @@ func (l *Location) Format(lang string) string {
 	return strings.Join(parts, " ")
 }
 
-// downloadFileWithProgress 下载文件并显示进度
+// downloadFileWithProgress - Download file with progress display
 func downloadFileWithProgress(filePath, url string) error {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -286,7 +285,7 @@ func downloadFileWithProgress(filePath, url string) error {
 	}
 	defer out.Close()
 
-	// 使用带缓冲的写入
+	// Use buffered writing
 	buf := make([]byte, 32*1024)
 	var downloaded int64
 	startTime := time.Now()
@@ -300,7 +299,7 @@ func downloadFileWithProgress(filePath, url string) error {
 			}
 			downloaded += int64(n)
 
-			// 只在百分比变化时显示
+			// Only display when percentage changes
 			if resp.ContentLength > 0 {
 				currentPercent := int(float64(downloaded) / float64(resp.ContentLength) * 100)
 				if currentPercent != lastPercent {
@@ -322,9 +321,9 @@ func downloadFileWithProgress(filePath, url string) error {
 	return nil
 }
 
-// GetBinaryDatabasePath 获取二进制数据库文件路径
+// GetBinaryDatabasePath - Get binary database file path
 func GetBinaryDatabasePath() string {
-	// 首先检查当前目录
+	// First check current directory
 	currentDir, _ := os.Getwd()
 	paths := []string{
 		filepath.Join(currentDir, BinaryDatabaseFile),
@@ -338,11 +337,11 @@ func GetBinaryDatabasePath() string {
 		}
 	}
 
-	// 如果都不存在，返回默认路径
+	// If none exist, return default path
 	return filepath.Join(currentDir, BinaryDatabaseFile)
 }
 
-// IsInitialized 检查数据库是否已初始化
+// IsInitialized - Check if database is initialized
 func (g *GeoIP) IsInitialized() bool {
 	return g.initialized
 }

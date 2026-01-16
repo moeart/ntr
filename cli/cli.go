@@ -116,12 +116,8 @@ var RootCmd = &cobra.Command{
 			return err
 		}
 		if jsonFmt {
-			go func(ch chan struct{}) {
-				for {
-					<-ch
-				}
-			}(ch)
 			m.Run(ch, COUNT)
+			close(ch)
 			s, err := pj.Marshal(m)
 			if err != nil {
 				return err

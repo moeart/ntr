@@ -23,7 +23,7 @@ import (
 	"github.com/moeart/ntr/pkg/icmp"
 )
 
-// 工具名称和版权信息，定义为全局变量以便其他包访问
+// Tool name and copyright information, defined as global variables for access by other packages
 var (
 	ToolName      = "NTR - MoeArt's Network Traceroute"
 	ToolCopyright = "(c)2016-2026 MoeArt OpenSource, www.acgdraw.com"
@@ -52,29 +52,29 @@ type NTR struct {
 func NewNTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
 	hopsleep time.Duration, maxHops, maxUnknownHops, ringBufferSize int, ptr bool, enableAsn bool, enableGeoIP bool, lang string, useQQWry bool, forceIPv4 bool, forceIPv6 bool) (*NTR, chan struct{}, error) {
 	if net.ParseIP(addr) == nil {
-		// 域名解析
+		// Domain resolution
 		if forceIPv4 {
-			// 强制解析 IPv4 地址
+			// Force resolve IPv4 address
 			ipAddr, err := net.ResolveIPAddr("ip4", addr)
 			if err != nil {
 				return nil, nil, fmt.Errorf("no IPv4 address found for host: %s", err)
 			}
 			addr = ipAddr.IP.String()
 		} else if forceIPv6 {
-			// 强制解析 IPv6 地址
+			// Force resolve IPv6 address
 			ipAddr, err := net.ResolveIPAddr("ip6", addr)
 			if err != nil {
 				return nil, nil, fmt.Errorf("no IPv6 address found for host: %s", err)
 			}
 			addr = ipAddr.IP.String()
 		} else {
-			// 默认解析行为：IPv6 优先（如果可用）
-			// 先尝试解析 IPv6 地址
+			// Default resolution behavior: IPv6 first (if available)
+			// First try to resolve IPv6 address
 			ipv6Addr, err := net.ResolveIPAddr("ip6", addr)
 			if err == nil {
 				addr = ipv6Addr.IP.String()
 			} else {
-				// IPv6 解析失败，尝试解析 IPv4 地址
+				// IPv6 resolution failed, try to resolve IPv4 address
 				ipv4Addr, err := net.ResolveIPAddr("ip4", addr)
 				if err != nil {
 					return nil, nil, fmt.Errorf("no valid IP address found for host: %s", err)
@@ -110,7 +110,7 @@ func NewNTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
 	}
 
 	if enableAsn {
-		// 加载 ASN 数据库
+		// Load ASN database
 		var err error
 		ntr.asns, err = asn.NewASNs()
 		if err != nil {
@@ -119,7 +119,7 @@ func NewNTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
 	}
 
 	if enableGeoIP {
-		// 加载 GeoIP 数据库
+		// Load GeoIP database
 		var err error
 		ntr.geoip, err = geoip.NewGeoIP()
 		if err != nil {
@@ -142,9 +142,9 @@ func (m *NTR) registerStatistic(ttl int, r icmp.ICMPReturn) *hop.HopStatistic {
 			Lost:           0,
 			Packets:        ring.New(m.ringBufferSize),
 			RingBufferSize: m.ringBufferSize,
-			Targets:        []string{}, // 初始化 Targets 字段，防止 nil 指针引用
-			Asns:           m.asns,     // 设置 ASNs 字段
-			GeoIP:          m.geoip,    // 设置 GeoIP 字段
+			Targets:        []string{}, // Initialize Targets field to prevent nil pointer reference
+			Asns:           m.asns,     // Set ASNs field
+			GeoIP:          m.geoip,    // Set GeoIP field
 			Lang:           m.lang,
 			UseQQWry:       m.useQQWry,
 		}
@@ -206,7 +206,7 @@ func addTarget(currentTargets []string, toAdd string) []string {
 }
 
 // TODO: aggregates everything using the first target even when there are multiple
-// 定义 Windows API 函数和结构体
+// Define Windows API functions and structures
 var (
 	kernel32            = syscall.NewLazyDLL("kernel32.dll")
 	getConsoleScreenBuf = kernel32.NewProc("GetConsoleScreenBufferInfo")
@@ -228,7 +228,7 @@ type consoleScreenBufferInfo struct {
 	DwMaximumWindowSize coord
 }
 
-// 使用 Windows API 直接获取控制台尺寸，更准确和快速
+// Use Windows API to get console size directly, more accurate and faster
 func GetTerminalSize() (int, int) {
 	var csbi consoleScreenBufferInfo
 	r1, _, _ := getConsoleScreenBuf.Call(
@@ -238,9 +238,9 @@ func GetTerminalSize() (int, int) {
 	if r1 != 0 {
 		width := int(csbi.SrWindow.Right - csbi.SrWindow.Left + 1)
 		height := int(csbi.SrWindow.Bottom - csbi.SrWindow.Top + 1)
-		width -= 2 // 横向减少2个字符，避免界面超出边界
+		width -= 2 // Reduce width by 2 characters to avoid interface overflow
 
-		// 确保宽度至少是 78，高度至少是 25
+		// Ensure width is at least 78 and height is at least 25
 		if width < 78 {
 			width = 78
 		}
@@ -251,13 +251,13 @@ func GetTerminalSize() (int, int) {
 		return width, height
 	}
 
-	// 如果 API 调用失败，使用 mode con 命令作为备用方法
+	// If API call fails, use mode con command as fallback
 	cmd := exec.Command("mode", "con")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
 	if err == nil {
-		// 解析输出
+		// Parse output
 		output := out.String()
 		widthRegex := regexp.MustCompile(`Columns:\s*(\d+)`)
 		heightRegex := regexp.MustCompile(`Lines:\s*(\d+)`)
@@ -279,7 +279,7 @@ func GetTerminalSize() (int, int) {
 			height = 25
 		}
 
-		// 确保宽度至少是 78，高度至少是 25
+		// Ensure width is at least 78 and height is at least 25
 		if width < 78 {
 			width = 78
 		}
@@ -290,11 +290,11 @@ func GetTerminalSize() (int, int) {
 		return width, height
 	}
 
-	// 如果都失败，使用 goterm 的默认方法
+	// If all fail, use goterm's default method
 	width := gm.Width() - 2
 	height := gm.Height()
 
-	// 确保宽度至少是 78，高度至少是 25
+	// Ensure width is at least 78 and height is at least 25
 	if width < 78 {
 		width = 78
 	}
@@ -305,11 +305,11 @@ func GetTerminalSize() (int, int) {
 	return width, height
 }
 
-// 检测窗口大小变化的函数
+// Function to detect window size changes
 func monitorWindowResize(resizeChan chan bool) {
 	prevWidth, _ := GetTerminalSize()
 	for {
-		time.Sleep(200 * time.Millisecond) // 每 200ms 检查一次
+		time.Sleep(200 * time.Millisecond) // Check every 200ms
 		currWidth, _ := GetTerminalSize()
 		if currWidth != prevWidth {
 			resizeChan <- true
@@ -320,13 +320,13 @@ func monitorWindowResize(resizeChan chan bool) {
 
 func (m *NTR) Render(offset int) {
 
-	// 获取终端尺寸
+	// Get terminal size
 	width, _ := GetTerminalSize()
-	maxLength := width - 3 // 防止溢出
+	maxLength := width - 3 // Prevent overflow
 
-	// 打印工具信息
+	// Print tool information
 
-	// 居中打印工具名称和版权信息
+	// Print tool name and copyright information centered
 	padding := (maxLength - len(ToolName)) / 2
 	if padding > 0 {
 		gm.Printf("%*s%s%*s\n", padding, "", ToolName, padding, "")
@@ -341,7 +341,7 @@ func (m *NTR) Render(offset int) {
 		gm.Printf("%s\n", ToolCopyright[:maxLength])
 	}
 
-	// 打印信息行
+	// Print information line
 	infoLeft := fmt.Sprintf("DEST: %s", m.Address)
 	startTime := time.Now().Format("2006-01-02 15:04:05")
 	infoRight := fmt.Sprintf("START: %s", startTime)
@@ -352,7 +352,7 @@ func (m *NTR) Render(offset int) {
 		gm.Printf("%s\n", infoLeft[:maxLength])
 	}
 
-	// 确定列格式，根据 IPv4/IPv6 调整 DESTINATION 列宽度
+	// Determine column format, adjust DESTINATION column width based on IPv4/IPv6
 	isIPv6 := net.ParseIP(m.Address).To4() == nil
 	var destWidth int
 	if isIPv6 {
@@ -361,7 +361,7 @@ func (m *NTR) Render(offset int) {
 		destWidth = 17
 	}
 
-	// 计算其他列宽度
+	// Calculate other column widths
 	lossWidth := 5
 	sentWidth := 5
 	lastWidth := 5
@@ -371,11 +371,11 @@ func (m *NTR) Render(offset int) {
 	asnWidth := 7
 	locationWidth := maxLength - 3 - 2 - destWidth - 2 - lossWidth - sentWidth - lastWidth - bestWidth - avgWidth - wrstWidth - 2 - asnWidth - 1
 
-	// 构建格式化字符串
+	// Build format string
 	format := fmt.Sprintf("%%3s  %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds  %%-%ds %%-%ds",
 		destWidth, lossWidth, sentWidth, lastWidth, bestWidth, avgWidth, wrstWidth, asnWidth, locationWidth)
 
-	// 打印标题栏
+	// Print title bar
 	title := fmt.Sprintf(format,
 		"#",
 		"DESTINATION",
@@ -389,16 +389,16 @@ func (m *NTR) Render(offset int) {
 		"LOCATION",
 	)
 
-	// 标题栏反差高亮效果
+	// Title bar contrast highlight effect
 	gm.Println(gm.Background(gm.Color(title, gm.BLACK), gm.WHITE))
 
-	// 打印跳数信息
+	// Print hop information
 	foundTarget := false
 	for i := 1; i <= len(m.Statistic); i++ {
 		m.mutex.RLock()
 		hopStat := m.Statistic[i]
 		if hopStat != nil && !foundTarget {
-			// 检查当前跳点是否包含目标地址
+			// Check if current hop contains the target address
 			for _, target := range hopStat.Targets {
 				if target == m.Address {
 					foundTarget = true
@@ -418,7 +418,7 @@ func (m *NTR) Render(offset int) {
 }
 
 func (m *NTR) Run(ch chan struct{}, count int) {
-	// 忽略 count 参数，让程序持续运行直到用户按下 Ctrl+C
+	// Ignore count parameter, let the program run continuously until Ctrl+C is pressed
 	m.discover(ch)
 }
 
