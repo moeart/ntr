@@ -58,9 +58,9 @@ jobs:
       id: ext
       run: |
         if [ "${{ matrix.goos }}" = "windows" ]; then
-          echo "::set-output name=extension::.exe"
+          echo "extension=.exe" >> "$GITHUB_OUTPUT"
         else
-          echo "::set-output name=extension::"
+          echo "extension=" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Build cross-platform
@@ -71,7 +71,7 @@ jobs:
         go build -o "dist/$OUTPUT_NAME" -ldflags "-X 'github.com/moeart/ntr/cli.version=$VERSION' -X 'github.com/moeart/ntr/cli.date=$BUILD_DATE'" .
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ntr-${{ matrix.goos }}-${{ matrix.goarch }}
         path: dist/ntr-${{ matrix.goos }}-${{ matrix.goarch }}${{ steps.ext.outputs.extension }}
