@@ -8,8 +8,8 @@ import (
 	"time"
 
 	tm "github.com/buger/goterm"
-	pj "github.com/hokaccha/go-prettyjson"
 	"github.com/moeart/ntr/pkg/asn"
+	"github.com/moeart/ntr/pkg/config"
 	"github.com/moeart/ntr/pkg/geoip"
 	"github.com/moeart/ntr/pkg/ntr"
 	"github.com/spf13/cobra"
@@ -27,46 +27,46 @@ var (
 	MAX_UNKNOWN_HOPS = 10
 	RING_BUFFER_SIZE = 128
 	PTR_LOOKUP       = false
-	jsonFmt          = false
-	srcAddr          = ""
-	versionFlag      bool
-	ENABLE_ASN       = true
-	UPDATE_ASN       = false
-	ENABLE_GEOIP     = true
-	UPDATE_GEOIP     = false
-	LANG             = "zh" // 默认语言为中文
-	forceIPv4        = false
-	forceIPv6        = false
+
+	srcAddr      = ""
+	versionFlag  bool
+	ENABLE_ASN   = true
+	UPDATE_ASN   = false
+	ENABLE_GEOIP = true
+	UPDATE_GEOIP = false
+	LANG         = "zh" // Default language is Chinese
+	forceIPv4    = false
+	forceIPv6    = false
 )
 
 // rootCmd represents the root command
 var RootCmd = &cobra.Command{
 	Use:          "ntr TARGET",
-	SilenceUsage: true, // 命令执行失败时不自动显示帮助信息
+	SilenceUsage: true, // Don't automatically show help information when command execution fails
 	Args: func(cmd *cobra.Command, args []string) error {
-		// 如果使用 --version、--help、--update-asn 或 --update-geoip，则不要求必须有目标参数
+		// If using --version, --help, --update-asn, or --update-geoip, target parameter is not required
 		if versionFlag || cmd.Flags().Changed("help") || cmd.Flags().Changed("update-asn") || cmd.Flags().Changed("update-geoip") {
 			return nil
 		}
-		// 如果没有参数，则显示帮助信息
+		// If no parameters, show help information
 		if len(args) == 0 {
 			cmd.Help()
 			os.Exit(0)
 		}
-		// 否则要求必须有且仅有一个目标参数
+		// Otherwise, require exactly 1 target parameter
 		if len(args) != 1 {
 			return fmt.Errorf("requires exactly 1 argument")
 		}
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// 检查是否请求了帮助
+		// Check if help was requested
 		if cmd.Flags().Changed("help") {
-			// 输出标题和版权信息
+			// Output title and copyright information
 			fmt.Printf("%s\n", ntr.ToolName)
 			fmt.Printf("%s\n", ntr.ToolCopyright)
 			fmt.Println()
-			// 调用默认的帮助函数
+			// Call default help function
 			cmd.Help()
 			return nil
 		}
@@ -77,35 +77,53 @@ var RootCmd = &cobra.Command{
 			fmt.Printf("NTR Version: %s, build date: %s\n", version, date)
 			return nil
 		}
-		// 处理 --update-asn 参数
+
+		// Load configuration
+		cfg, err := config.LoadConfigFromDefaultPath()
+		if err != nil {
+			return fmt.Errorf("Failed to load configuration: %v", err)
+		}
+
+		// Handle --update-asn parameter
 		if UPDATE_ASN {
 			fmt.Println("Updating ASN database...")
-			if err := asn.UpdateASNDatabase(); err != nil {
+			if err := asn.UpdateASNDatabase(cfg.GetASNDownloadURL()); err != nil {
 				return fmt.Errorf("Failed to update ASN database: %v", err)
 			}
 			fmt.Println("ASN database updated successfully.")
 			return nil
 		}
 
-		// 处理 --update-geoip 参数
+		// Handle --update-geoip parameter
 		if UPDATE_GEOIP {
 			fmt.Println("Updating GeoIP database...")
-			if err := geoip.UpdateGeoIPDatabase(); err != nil {
+			if err := geoip.UpdateGeoIPDatabase(cfg.GetGeoIPDownloadURL()); err != nil {
 				return fmt.Errorf("Failed to update GeoIP database: %v", err)
 			}
 			fmt.Println("GeoIP database updated successfully.")
 			return nil
 		}
 
-		// 检测时区，判断是否使用QQWry
+		// Detect timezone to determine whether to use QQWry
 		useQQWry := true
 		zone, _ := time.Now().Zone()
-		// 中国时区通常包含 "CST"（China Standard Time）
+		// Chinese timezone usually contains "CST" (China Standard Time)
 		if !strings.Contains(strings.ToUpper(zone), "CST") || LANG == "en" {
 			useQQWry = false
 		}
 
-		// 验证协议选项
+		// Set IP protocol preference according to configuration (if not specified by command line parameters)
+		if !forceIPv4 && !forceIPv6 {
+			switch cfg.Network.IPPreference {
+			case "ipv4":
+				forceIPv4 = true
+			case "ipv6":
+				forceIPv6 = true
+				// "auto" or other values maintain default behavior
+			}
+		}
+
+		// Verify protocol options
 		if forceIPv4 && forceIPv6 {
 			return fmt.Errorf("cannot use both -4 and -6 options at the same time")
 		}
@@ -115,24 +133,14 @@ var RootCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if jsonFmt {
-			m.Run(ch, COUNT)
-			close(ch)
-			s, err := pj.Marshal(m)
-			if err != nil {
-				return err
-			}
-			fmt.Println(string(s))
-			return nil
-		}
 
 		tm.Clear()
 		mu := &sync.Mutex{}
 
-		// 启动窗口大小变化监听
+		// Start window size change monitoring
 		go watchWindowSize()
 
-		// 处理网络更新和窗口大小变化
+		// Handle network updates and window size changes
 		go func(ch chan struct{}) {
 			for {
 				select {
@@ -157,7 +165,7 @@ var RootCmd = &cobra.Command{
 	},
 }
 
-// 创建窗口大小变化检测通道
+// Create window size change detection channel
 var resizeChan = make(chan bool, 1)
 
 func render(m *ntr.NTR) {
@@ -167,12 +175,12 @@ func render(m *ntr.NTR) {
 	tm.Flush() // Call it every time at the end of rendering
 }
 
-// 监听窗口大小变化的函数
+// Function to monitor window size changes
 func watchWindowSize() {
-	// 使用轮询方式检测窗口大小变化
+	// Use polling to detect window size changes
 	prevWidth, _ := ntr.GetTerminalSize()
 	for {
-		time.Sleep(200 * time.Millisecond) // 每 200ms 检查一次
+		time.Sleep(200 * time.Millisecond) // Check every 200ms
 		currWidth, _ := ntr.GetTerminalSize()
 		if currWidth != prevWidth {
 			resizeChan <- true
@@ -182,7 +190,7 @@ func watchWindowSize() {
 }
 
 func init() {
-	// 设置自定义的帮助信息格式，包含标题和版权信息
+	// Set custom help information format, including title and copyright information
 	RootCmd.SetUsageTemplate(`{{printf "%s" "NTR - MoeArt's Network Traceroute"}}
 {{printf "%s" "(c)2016-2026 MoeArt OpenSource, www.acgdraw.com"}}
 
@@ -212,10 +220,10 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.
 {{end}}`)
 
 	RootCmd.Flags().StringVarP(&srcAddr, "address", "s", srcAddr, "The address to bind the outgoing socket to")
-	// 添加短选项 -a 和 -g
+	// Add short options -a and -g
 	var disableASN bool
 	RootCmd.Flags().BoolVarP(&disableASN, "disable-asn", "a", false, "Disable IP to BGP AS number query.")
-	// 添加验证函数来修改 ENABLE_ASN 变量
+	// Add validation function to modify ENABLE_ASN variable
 	RootCmd.PreRun = func(cmd *cobra.Command, args []string) {
 		if disableASN {
 			ENABLE_ASN = false
@@ -225,9 +233,9 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.
 	var disableGeoIP bool
 	RootCmd.Flags().BoolVarP(&disableGeoIP, "disable-geoip", "g", false, "Disable IP to geographic location query.")
 	RootCmd.PreRun = func(cmd *cobra.Command, args []string) {
-		// 检查是否请求了帮助
+		// Check if help was requested
 		if cmd.Flags().Changed("help") {
-			// 输出标题和版权信息
+			// Output title and copyright information
 			fmt.Printf("%s\n", ntr.ToolName)
 			fmt.Printf("%s\n", ntr.ToolCopyright)
 			fmt.Println()
@@ -241,16 +249,12 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.
 	}
 
 	RootCmd.Flags().DurationVarP(&INTERVAL, "interval", "i", INTERVAL, "Seconds between each traceroute. (min:1)")
-	// 添加 IPv4 和 IPv6 选项
+	// Add IPv4 and IPv6 options
 	RootCmd.Flags().BoolVarP(&forceIPv4, "ipv4", "4", false, "Force using IPv4 protocol")
 	RootCmd.Flags().BoolVarP(&forceIPv6, "ipv6", "6", false, "Force using IPv6 protocol")
-	RootCmd.Flags().BoolVarP(&jsonFmt, "json", "j", jsonFmt, "Print JSON formatted results")
+
 	RootCmd.Flags().IntVarP(&MAX_HOPS, "max-hop", "m", MAX_HOPS, "Maximum number of hops to try. (min:1, max:255)")
 	RootCmd.Flags().DurationVarP(&TIMEOUT, "timeout", "t", TIMEOUT, "Stop waiting for router response in seconds. (min:1)")
-
-	// 添加域名验证选项
-	var unverifyTLD bool
-	RootCmd.Flags().BoolVarP(&unverifyTLD, "unverify-tld", "D", false, "Disable Domain Available Verification.")
 
 	RootCmd.Flags().BoolVarP(&UPDATE_ASN, "update-asn", "U", UPDATE_ASN, "Update ASN database from online source.")
 	RootCmd.Flags().BoolVarP(&UPDATE_GEOIP, "update-geoip", "G", UPDATE_GEOIP, "Update GeoIP database from online source.")

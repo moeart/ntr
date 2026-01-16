@@ -376,17 +376,29 @@ func (m *NTR) Render(offset int) {
 		destWidth, lossWidth, sentWidth, lastWidth, bestWidth, avgWidth, wrstWidth, asnWidth, locationWidth)
 
 	// Print title bar
+	// title := fmt.Sprintf(format,
+	// 	"#",
+	// 	"DESTINATION",
+	// 	"LOSS%",
+	// 	"SENT",
+	// 	"LAST",
+	// 	"BEST",
+	// 	"AVG",
+	// 	"WRST",
+	// 	"ASN",
+	// 	"LOCATION",
+	// )
 	title := fmt.Sprintf(format,
 		"#",
-		"DESTINATION",
-		"LOSS%",
-		"SENT",
-		"LAST",
-		"BEST",
-		"AVG",
-		"WRST",
+		"目标主机",
+		"丢包%",
+		"发送",
+		"最近",
+		"最快",
+		"平均",
+		"最慢",
 		"ASN",
-		"LOCATION",
+		"IP位置信息",
 	)
 
 	// Title bar contrast highlight effect

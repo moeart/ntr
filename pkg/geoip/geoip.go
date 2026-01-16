@@ -3,7 +3,6 @@ package geoip
 import (
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -42,9 +41,14 @@ func NewGeoIP() (*GeoIP, error) {
 	return geoip, nil
 }
 
-// UpdateGeoIPDatabase - Download latest GeoIP database from metowolf/qqwry.dat
-func UpdateGeoIPDatabase() error {
-	log.Println("Starting GeoIP database update from server ...")
+// UpdateGeoIPDatabase - Download latest GeoIP database from specified URL
+func UpdateGeoIPDatabase(downloadURL string) error {
+	// If no URL provided, use default
+	if downloadURL == "" {
+		downloadURL = GeoIPURL
+	}
+
+	fmt.Println("Starting GeoIP database update")
 
 	// Ensure data directory exists
 	if err := os.MkdirAll("data", 0755); err != nil {
@@ -52,12 +56,12 @@ func UpdateGeoIPDatabase() error {
 	}
 
 	// Download database file
-	log.Println("Downloading GeoIP database ...")
-	if err := downloadFileWithProgress(GetBinaryDatabasePath(), GeoIPURL); err != nil {
+	fmt.Printf("Downloading GeoIP database from %s ...\n", downloadURL)
+	if err := downloadFileWithProgress(GetBinaryDatabasePath(), downloadURL); err != nil {
 		return fmt.Errorf("failed to download GeoIP database: %v", err)
 	}
 
-	log.Println("GeoIP database updated successfully")
+	fmt.Println("GeoIP database updated successfully")
 	return nil
 }
 
@@ -317,7 +321,7 @@ func downloadFileWithProgress(filePath, url string) error {
 	}
 
 	fmt.Println()
-	log.Printf("Download completed in %v", time.Since(startTime))
+	fmt.Printf("Download completed in %v", time.Since(startTime))
 	return nil
 }
 

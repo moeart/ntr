@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -70,9 +69,14 @@ func NewASNs() (*ASNs, error) {
 	return asns, nil
 }
 
-// UpdateASNDatabase - Download latest ASN database from iptoasn.com
-func UpdateASNDatabase() error {
-	log.Println("Starting ASN database update from iptoasn.com")
+// UpdateASNDatabase - Download latest ASN database from specified URL
+func UpdateASNDatabase(downloadURL string) error {
+	// If no URL provided, use default
+	if downloadURL == "" {
+		downloadURL = IPToASNURL
+	}
+
+	fmt.Println("Starting ASN database update")
 
 	// Ensure data directory exists
 	if err := os.MkdirAll("data", 0755); err != nil {
@@ -80,19 +84,19 @@ func UpdateASNDatabase() error {
 	}
 
 	// Download gzip file
-	log.Println("Downloading ip2asn-combined.tsv.gz...")
-	if err := downloadFileWithProgress(TempGZFile, IPToASNURL); err != nil {
+	fmt.Printf("Downloading ip2asn-combined.tsv.gz from %s...\n", downloadURL)
+	if err := downloadFileWithProgress(TempGZFile, downloadURL); err != nil {
 		return fmt.Errorf("failed to download database: %v", err)
 	}
 
 	// Decompress gzip file
-	log.Println("Decompressing downloaded file...")
+	fmt.Println("Decompressing downloaded file...")
 	if err := gunzipFile(TempGZFile, TempTSVFile); err != nil {
 		cleanupTempFiles()
 		return fmt.Errorf("failed to decompress database: %v", err)
 	}
 
-	log.Println("Compiling database to binary...")
+	fmt.Println("Compiling database to binary...")
 	// First collect all ASN records
 	records, err := collectASNRecords(TempTSVFile)
 	if err != nil {
@@ -107,7 +111,7 @@ func UpdateASNDatabase() error {
 	}
 
 	cleanupTempFiles()
-	log.Printf("Database updated successfully, %d records compiled", len(records))
+	fmt.Printf("Database updated successfully, %d records compiled", len(records))
 	return nil
 }
 
@@ -527,7 +531,7 @@ func downloadFileWithProgress(filePath, url string) error {
 	}
 
 	fmt.Println()
-	log.Printf("Download completed in %v", time.Since(startTime))
+	fmt.Printf("Download completed in %v", time.Since(startTime))
 	return nil
 }
 
@@ -606,7 +610,7 @@ func cleanupTempFiles() {
 	for _, fileName := range filesToRemove {
 		if _, err := os.Stat(fileName); err == nil {
 			if err := os.Remove(fileName); err != nil {
-				log.Printf("Failed to remove %s: %v", fileName, err)
+				fmt.Printf("Failed to remove %s: %v", fileName, err)
 			}
 		}
 	}

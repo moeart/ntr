@@ -1,0 +1,42 @@
+# NTR - MoeArt's Network Traceroute Configuration File
+
+# ASN (Autonomous System Number) configuration
+asn:
+  # Download URL for ASN database
+  download_url: "https://iptoasn.com/data/ip2asn-combined.tsv.gz"
+  # Enable ASN lookup by default
+  enable: true
+
+# GeoIP (Geographic IP) configuration
+geoip:
+  # Download URL for GeoIP database
+  download_url: "https://github.com/metowolf/qqwry.dat/releases/latest/download/qqwry.dat"
+  # Enable GeoIP lookup by default
+  enable: true
+  # Use QQWry database for GeoIP lookup (Chinese users)
+  use_qqwry: true
+
+# Network configuration
+network:
+  # IP protocol preference: "ipv4", "ipv6", or "auto"
+  # "auto" means try IPv6 first, then IPv4
+  ip_preference: "ipv4"
+  # Maximum number of hops to try
+  max_hops: 25
+  # Maximum number of unknown hops
+  max_unknown_hops: 10
+  # Timeout for router responses
+  timeout: 1000ms
+  # Interval between traceroute runs
+  interval: 200ms
+  # Sleep time between hops
+  hop_sleep: 0ms
+
+# Display configuration
+display:
+  # Language: "zh" (Chinese) or "en" (English)
+  language: "zh"
+  # Enable PTR lookup
+  ptr_lookup: false
+  # Size of ring buffer for storing results
+  ring_buffer_size: 128
