@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"strings"
 	"time"
 
 	gm "github.com/buger/goterm"
@@ -222,9 +223,24 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 
 	// 获取 LOCATION 信息
 	var locationStr string
-	if h.GeoIP != nil && h.GeoIP.IsInitialized() && h.Targets != nil && len(h.Targets) > 0 && h.Targets[0] != "" {
-		if loc, err := h.GeoIP.LookupByIP(h.Targets[0], h.Lang, h.UseQQWry); err == nil && loc != nil {
-			locationStr = loc.Format(h.Lang)
+	if h.Targets != nil && len(h.Targets) > 0 && h.Targets[0] != "" {
+		if h.GeoIP != nil {
+			if loc, err := h.GeoIP.LookupByIP(h.Targets[0], h.Lang, h.UseQQWry, h.Asns); err == nil && loc != nil {
+				locationStr = loc.Format(h.Lang)
+			} else {
+				locationStr = "- -"
+			}
+		} else if h.Asns != nil {
+			// 如果没有 GeoIP，但有 ASN 数据，也尝试获取位置信息
+			if a, err := h.Asns.LookupByIP(h.Targets[0]); err == nil && a != nil && a.Country != "" {
+				parts := []string{a.Country}
+				if a.Description != "" {
+					parts = append(parts, a.Description)
+				}
+				locationStr = strings.Join(parts, " ")
+			} else {
+				locationStr = "- -"
+			}
 		} else {
 			locationStr = "- -"
 		}

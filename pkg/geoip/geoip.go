@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/moeart/ntr/pkg/asn"
 	"github.com/xiaoqidun/qqwry"
 )
 
@@ -162,7 +163,7 @@ func isSpecialIP(ipStr string, lang string) *Location {
 }
 
 // LookupByIP 查询IP地址信息
-func (g *GeoIP) LookupByIP(ipStr string, lang string, useQQWry bool) (*Location, error) {
+func (g *GeoIP) LookupByIP(ipStr string, lang string, useQQWry bool, asns *asn.ASNs) (*Location, error) {
 	// 首先检查是否是特殊IP地址
 	specialLoc := isSpecialIP(ipStr, lang)
 	if specialLoc != nil {
@@ -170,22 +171,32 @@ func (g *GeoIP) LookupByIP(ipStr string, lang string, useQQWry bool) (*Location,
 	}
 
 	// 根据条件决定是否使用QQWry查询
-	if !useQQWry || !g.initialized {
-		return &Location{Country: "N/A"}, nil
+	if useQQWry && g.initialized {
+		location, err := qqwry.QueryIP(ipStr)
+		if err == nil {
+			return &Location{
+				Country:  location.Country,
+				Province: location.Province,
+				City:     location.City,
+				District: location.District,
+				ISP:      location.ISP,
+			}, nil
+		}
 	}
 
-	location, err := qqwry.QueryIP(ipStr)
-	if err != nil {
-		return nil, err
+	// 如果无法使用QQWry数据库，尝试从ASN数据中获取信息
+	if asns != nil {
+		if a, err := asns.LookupByIP(ipStr); err == nil && a != nil {
+			// 从ASN数据中提取国家代码和描述信息
+			// ASN的Country字段通常是2字母的国家代码，Description字段包含ISP信息
+			return &Location{
+				Country: a.Country,
+				ISP:     a.Description,
+			}, nil
+		}
 	}
 
-	return &Location{
-		Country:  location.Country,
-		Province: location.Province,
-		City:     location.City,
-		District: location.District,
-		ISP:      location.ISP,
-	}, nil
+	return &Location{Country: "N/A"}, nil
 }
 
 // Location 表示地理位置信息
@@ -213,34 +224,49 @@ func (l *Location) Format(lang string) string {
 		}
 	}
 
-	// 中国范围内不显示国家
-	if l.Country == "中国" {
-		if l.Province != "" {
-			parts = append(parts, l.Province)
-		}
-		if l.City != "" {
-			parts = append(parts, l.City)
-		}
-		if l.District != "" {
-			parts = append(parts, l.District)
-		}
-	} else {
-		if l.Country != "" {
+	// 如果是从ASN获取的数据（通常Country是2字母代码，Province/City为空）
+	if l.Country != "" && l.Province == "" && l.City == "" && l.District == "" {
+		if l.Country != "N/A" {
 			parts = append(parts, l.Country)
 		}
-		if l.Province != "" {
-			parts = append(parts, l.Province)
+		if l.ISP != "" {
+			parts = append(parts, l.ISP)
 		}
-		if l.City != "" {
-			parts = append(parts, l.City)
+	} else {
+		// 中国范围内不显示国家
+		if l.Country == "中国" {
+			if l.Province != "" {
+				parts = append(parts, l.Province)
+			}
+			if l.City != "" {
+				parts = append(parts, l.City)
+			}
+			if l.District != "" {
+				parts = append(parts, l.District)
+			}
+		} else {
+			if l.Country != "" {
+				parts = append(parts, l.Country)
+			}
+			if l.Province != "" {
+				parts = append(parts, l.Province)
+			}
+			if l.City != "" {
+				parts = append(parts, l.City)
+			}
+			if l.District != "" {
+				parts = append(parts, l.District)
+			}
 		}
-		if l.District != "" {
-			parts = append(parts, l.District)
+
+		if l.ISP != "" {
+			parts = append(parts, l.ISP)
 		}
 	}
 
-	if l.ISP != "" {
-		parts = append(parts, l.ISP)
+	// 如果没有任何信息，返回 N/A
+	if len(parts) == 0 {
+		return "N/A"
 	}
 
 	return strings.Join(parts, " ")
