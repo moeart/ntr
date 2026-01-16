@@ -406,7 +406,7 @@ func (m *NTR) discover(ch chan struct{}) {
 	for {
 		time.Sleep(m.interval)
 		var wg sync.WaitGroup
-		for ttl := 1; ttl < m.maxHops; ttl++ {
+		for ttl := 1; ttl <= m.maxHops; ttl++ {
 			wg.Add(1)
 			go func(ttlVal int, seqVal int) {
 				defer wg.Done()
