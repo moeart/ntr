@@ -133,6 +133,47 @@ func (h *HopStatistic) packets() []*packet {
 	return v
 }
 
+// getStringDisplayWidth 计算字符串的显示宽度，中文字符计为2个宽度，英文字符计为1个宽度
+func getStringDisplayWidth(s string) int {
+	width := 0
+	for _, r := range s {
+		if r >= 0x4e00 && r <= 0x9fff {
+			// 中文字符占用2个宽度
+			width += 2
+		} else {
+			// 其他字符占用1个宽度
+			width += 1
+		}
+	}
+	return width
+}
+
+// truncateString 安全地截断字符串，避免截断多字节字符，基于显示宽度
+func truncateString(s string, maxWidth int) string {
+	if getStringDisplayWidth(s) <= maxWidth {
+		return s
+	}
+
+	// 确保不会截断UTF-8字符，基于显示宽度进行截断
+	var truncated string
+	currentWidth := 0
+	for _, r := range s {
+		runeWidth := 1
+		if r >= 0x4e00 && r <= 0x9fff {
+			runeWidth = 2
+		}
+
+		if currentWidth+runeWidth > maxWidth {
+			break
+		}
+
+		truncated += string(r)
+		currentWidth += runeWidth
+	}
+
+	return truncated
+}
+
 func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 	if h == nil {
 		gm.Println("nil HopStatistic")
@@ -178,9 +219,9 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 		dest = h.lookupAddr(ptrLookup, 0)
 	}
 
-	// 截断目标地址以适应列宽
-	if len(dest) > destWidth {
-		dest = dest[:destWidth]
+	// 安全截断目标地址以适应列宽，避免截断多字节字符
+	if getStringDisplayWidth(dest) > destWidth {
+		dest = truncateString(dest, destWidth)
 	}
 
 	// 获取延迟值
@@ -248,9 +289,9 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 		locationStr = "- -"
 	}
 
-	// 截断位置信息以适应列宽
-	if len(locationStr) > locationWidth {
-		locationStr = locationStr[:locationWidth]
+	// 安全截断位置信息以适应列宽，避免截断多字节字符
+	if getStringDisplayWidth(locationStr) > locationWidth {
+		locationStr = truncateString(locationStr, locationWidth)
 	}
 
 	// 构建行内容
@@ -267,9 +308,9 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 		locationStr, // LOCATION 列
 	)
 
-	// 确保行内容不超过终端宽度
-	if len(line) > maxLength {
-		line = line[:maxLength]
+	// 确保行内容不超过终端宽度，使用安全截断
+	if getStringDisplayWidth(line) > maxLength {
+		line = truncateString(line, maxLength)
 	}
 
 	gm.Printf("%s\n", line)
