@@ -1,21 +1,15 @@
 package ntr
 
 import (
-	"bytes"
 	"container/ring"
 	"fmt"
 	"math"
 	"math/rand"
 	"net"
-	"os/exec"
-	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
-	"unsafe"
 
 	gm "github.com/buger/goterm"
 	"github.com/moeart/ntr/pkg/asn"
@@ -207,27 +201,6 @@ func addTarget(currentTargets []string, toAdd string) []string {
 }
 
 // TODO: aggregates everything using the first target even when there are multiple
-// Define Windows API functions and structures
-var (
-	kernel32            = syscall.NewLazyDLL("kernel32.dll")
-	getConsoleScreenBuf = kernel32.NewProc("GetConsoleScreenBufferInfo")
-)
-
-type coord struct {
-	X, Y int16
-}
-
-type smallRect struct {
-	Left, Top, Right, Bottom int16
-}
-
-type consoleScreenBufferInfo struct {
-	DwSize              coord
-	DwCursorPosition    coord
-	WAttributes         uint16
-	SrWindow            smallRect
-	DwMaximumWindowSize coord
-}
 
 // GetTerminalSize - Get terminal size, compatible with Windows, Linux and macOS
 func GetTerminalSize() (int, int) {
@@ -236,48 +209,8 @@ func GetTerminalSize() (int, int) {
 	switch runtime.GOOS {
 	case "windows":
 		// Windows implementation
-		var csbi consoleScreenBufferInfo
-		r1, _, _ := getConsoleScreenBuf.Call(
-			uintptr(syscall.Stdout),
-			uintptr(unsafe.Pointer(&csbi)),
-		)
-		if r1 != 0 {
-			width = int(csbi.SrWindow.Right - csbi.SrWindow.Left + 1)
-			height = int(csbi.SrWindow.Bottom - csbi.SrWindow.Top + 1)
-			width -= 2 // Reduce width by 2 characters to avoid interface overflow
-		} else {
-			// If API call fails, use mode con command as fallback
-			cmd := exec.Command("mode", "con")
-			var out bytes.Buffer
-			cmd.Stdout = &out
-			err := cmd.Run()
-			if err == nil {
-				// Parse output
-				output := out.String()
-				widthRegex := regexp.MustCompile(`Columns:\s*(\d+)`)
-				heightRegex := regexp.MustCompile(`Lines:\s*(\d+)`)
-
-				widthMatch := widthRegex.FindStringSubmatch(output)
-				heightMatch := heightRegex.FindStringSubmatch(output)
-
-				if len(widthMatch) > 1 {
-					width, _ = strconv.Atoi(widthMatch[1])
-					width -= 2
-				} else {
-					width = 78
-				}
-
-				if len(heightMatch) > 1 {
-					height, _ = strconv.Atoi(heightMatch[1])
-				} else {
-					height = 25
-				}
-			} else {
-				// If all fail, use goterm's default method
-				width = gm.Width() - 2
-				height = gm.Height()
-			}
-		}
+		// Use the Windows-specific implementation from ntr_windows.go
+		width, height = getWindowsTerminalSize()
 	case "linux", "darwin":
 		// Linux and macOS implementation
 		// Use goterm's method for cross-platform compatibility

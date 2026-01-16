@@ -7,7 +7,7 @@ require (
 	github.com/hokaccha/go-prettyjson v0.0.0-20180920040306-f579f869bbfe
 	github.com/spf13/cobra v1.0.0
 	github.com/xiaoqidun/qqwry v0.0.0-20260116024434-063da5d9fbd0
-	golang.org/x/net v0.0.0-20190522155817-f3200d17e092
+	golang.org/x/net v0.49.0
 )
 
 require (
@@ -17,7 +17,7 @@ require (
 	github.com/mattn/go-colorable v0.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.4 // indirect
 	github.com/spf13/pflag v1.0.3 // indirect
-	golang.org/x/sys v0.0.0-20190220154126-629670e5acc5 // indirect
+	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
