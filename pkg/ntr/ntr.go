@@ -1,6 +1,3 @@
-//go:build windows
-// +build windows
-
 package ntr
 
 import (
@@ -12,6 +9,7 @@ import (
 	"net"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -231,71 +229,65 @@ type consoleScreenBufferInfo struct {
 	DwMaximumWindowSize coord
 }
 
-// Use Windows API to get console size directly, more accurate and faster
+// GetTerminalSize - Get terminal size, compatible with Windows, Linux and macOS
 func GetTerminalSize() (int, int) {
-	var csbi consoleScreenBufferInfo
-	r1, _, _ := getConsoleScreenBuf.Call(
-		uintptr(syscall.Stdout),
-		uintptr(unsafe.Pointer(&csbi)),
-	)
-	if r1 != 0 {
-		width := int(csbi.SrWindow.Right - csbi.SrWindow.Left + 1)
-		height := int(csbi.SrWindow.Bottom - csbi.SrWindow.Top + 1)
-		width -= 2 // Reduce width by 2 characters to avoid interface overflow
+	var width, height int
 
-		// Ensure width is at least 78 and height is at least 25
-		if width < 78 {
-			width = 78
-		}
-		if height < 25 {
-			height = 25
-		}
-
-		return width, height
-	}
-
-	// If API call fails, use mode con command as fallback
-	cmd := exec.Command("mode", "con")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err := cmd.Run()
-	if err == nil {
-		// Parse output
-		output := out.String()
-		widthRegex := regexp.MustCompile(`Columns:\s*(\d+)`)
-		heightRegex := regexp.MustCompile(`Lines:\s*(\d+)`)
-
-		widthMatch := widthRegex.FindStringSubmatch(output)
-		heightMatch := heightRegex.FindStringSubmatch(output)
-
-		var width, height int
-		if len(widthMatch) > 1 {
-			width, _ = strconv.Atoi(widthMatch[1])
-			width -= 2
+	switch runtime.GOOS {
+	case "windows":
+		// Windows implementation
+		var csbi consoleScreenBufferInfo
+		r1, _, _ := getConsoleScreenBuf.Call(
+			uintptr(syscall.Stdout),
+			uintptr(unsafe.Pointer(&csbi)),
+		)
+		if r1 != 0 {
+			width = int(csbi.SrWindow.Right - csbi.SrWindow.Left + 1)
+			height = int(csbi.SrWindow.Bottom - csbi.SrWindow.Top + 1)
+			width -= 2 // Reduce width by 2 characters to avoid interface overflow
 		} else {
-			width = 78
-		}
+			// If API call fails, use mode con command as fallback
+			cmd := exec.Command("mode", "con")
+			var out bytes.Buffer
+			cmd.Stdout = &out
+			err := cmd.Run()
+			if err == nil {
+				// Parse output
+				output := out.String()
+				widthRegex := regexp.MustCompile(`Columns:\s*(\d+)`)
+				heightRegex := regexp.MustCompile(`Lines:\s*(\d+)`)
 
-		if len(heightMatch) > 1 {
-			height, _ = strconv.Atoi(heightMatch[1])
-		} else {
-			height = 25
-		}
+				widthMatch := widthRegex.FindStringSubmatch(output)
+				heightMatch := heightRegex.FindStringSubmatch(output)
 
-		// Ensure width is at least 78 and height is at least 25
-		if width < 78 {
-			width = 78
-		}
-		if height < 25 {
-			height = 25
-		}
+				if len(widthMatch) > 1 {
+					width, _ = strconv.Atoi(widthMatch[1])
+					width -= 2
+				} else {
+					width = 78
+				}
 
-		return width, height
+				if len(heightMatch) > 1 {
+					height, _ = strconv.Atoi(heightMatch[1])
+				} else {
+					height = 25
+				}
+			} else {
+				// If all fail, use goterm's default method
+				width = gm.Width() - 2
+				height = gm.Height()
+			}
+		}
+	case "linux", "darwin":
+		// Linux and macOS implementation
+		// Use goterm's method for cross-platform compatibility
+		width = gm.Width() - 2
+		height = gm.Height()
+	default:
+		// Fallback for other platforms
+		width = gm.Width() - 2
+		height = gm.Height()
 	}
-
-	// If all fail, use goterm's default method
-	width := gm.Width() - 2
-	height := gm.Height()
 
 	// Ensure width is at least 78 and height is at least 25
 	if width < 78 {
