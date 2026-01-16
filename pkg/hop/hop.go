@@ -9,6 +9,7 @@ import (
 	"time"
 
 	gm "github.com/buger/goterm"
+	"github.com/moeart/ntr/pkg/asn"
 	"github.com/moeart/ntr/pkg/icmp"
 )
 
@@ -27,6 +28,7 @@ type HopStatistic struct {
 	Packets        *ring.Ring
 	RingBufferSize int
 	dnsCache       map[string]string
+	Asns           *asn.ASNs
 }
 
 type packet struct {
@@ -202,6 +204,18 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 		wrst = fmt.Sprintf("%.0f", h.Worst.Elapsed.Seconds()*1000)
 	}
 
+	// 获取 ASN 信息
+	var asnStr string
+	if h.Asns != nil && h.Targets != nil && len(h.Targets) > 0 && h.Targets[0] != "" {
+		if a, err := h.Asns.LookupByIP(h.Targets[0]); err == nil && a != nil && a.Number != "AS0" {
+			asnStr = a.Number
+		} else {
+			asnStr = "- -"
+		}
+	} else {
+		asnStr = "- -"
+	}
+
 	// 构建行内容
 	line := fmt.Sprintf(format,
 		h.TTL,
@@ -212,8 +226,8 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 		best,
 		avg,
 		wrst,
-		"- -", // ASN 列暂时留空
-		"",    // LOCATION 列暂时留空
+		asnStr, // ASN 列
+		"",     // LOCATION 列暂时留空
 	)
 
 	// 确保行内容不超过终端宽度

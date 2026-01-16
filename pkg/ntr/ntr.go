@@ -17,6 +17,7 @@ import (
 	"unsafe"
 
 	gm "github.com/buger/goterm"
+	"github.com/moeart/ntr/pkg/asn"
 	"github.com/moeart/ntr/pkg/hop"
 	"github.com/moeart/ntr/pkg/icmp"
 )
@@ -33,10 +34,12 @@ type NTR struct {
 	maxHops        int
 	maxUnknownHops int
 	ptrLookup      bool
+	enableAsn      bool
+	asns           *asn.ASNs
 }
 
 func NewNTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
-	hopsleep time.Duration, maxHops, maxUnknownHops, ringBufferSize int, ptr bool) (*NTR, chan struct{}, error) {
+	hopsleep time.Duration, maxHops, maxUnknownHops, ringBufferSize int, ptr bool, enableAsn bool) (*NTR, chan struct{}, error) {
 	if net.ParseIP(addr) == nil {
 		addrs, err := net.LookupHost(addr)
 		if err != nil || len(addrs) == 0 {
@@ -51,7 +54,8 @@ func NewNTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
 			srcAddr = "::"
 		}
 	}
-	return &NTR{
+
+	ntr := &NTR{
 		SrcAddress:     srcAddr,
 		interval:       interval,
 		timeout:        timeout,
@@ -63,7 +67,19 @@ func NewNTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
 		ringBufferSize: ringBufferSize,
 		maxUnknownHops: maxUnknownHops,
 		ptrLookup:      ptr,
-	}, make(chan struct{}), nil
+		enableAsn:      enableAsn,
+	}
+
+	if enableAsn {
+		// 加载 ASN 数据库
+		var err error
+		ntr.asns, err = asn.NewASNs()
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return ntr, make(chan struct{}), nil
 }
 
 func (m *NTR) registerStatistic(ttl int, r icmp.ICMPReturn) *hop.HopStatistic {
@@ -79,6 +95,7 @@ func (m *NTR) registerStatistic(ttl int, r icmp.ICMPReturn) *hop.HopStatistic {
 			Packets:        ring.New(m.ringBufferSize),
 			RingBufferSize: m.ringBufferSize,
 			Targets:        []string{}, // 初始化 Targets 字段，防止 nil 指针引用
+			Asns:           m.asns,     // 设置 ASNs 字段
 		}
 		m.Statistic[ttl] = s
 	}

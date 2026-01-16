@@ -7,6 +7,7 @@ require (
 	github.com/hokaccha/go-prettyjson v0.0.0-20180920040306-f579f869bbfe
 	github.com/spf13/cobra v0.0.3
 	golang.org/x/net v0.0.0-20190213061140-3a22650c66bd
+	golang.org/x/text v0.33.0
 )
 
 require (

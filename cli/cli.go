@@ -7,6 +7,7 @@ import (
 
 	tm "github.com/buger/goterm"
 	pj "github.com/hokaccha/go-prettyjson"
+	"github.com/moeart/ntr/pkg/asn"
 	"github.com/moeart/ntr/pkg/ntr"
 	"github.com/spf13/cobra"
 )
@@ -26,14 +27,16 @@ var (
 	jsonFmt          = false
 	srcAddr          = ""
 	versionFlag      bool
+	ENABLE_ASN       = false
+	UPDATE_ASN       = false
 )
 
 // rootCmd represents the root command
 var RootCmd = &cobra.Command{
 	Use: "ntr TARGET",
 	Args: func(cmd *cobra.Command, args []string) error {
-		// 如果使用 --version 或 --help，则不要求必须有目标参数
-		if versionFlag || cmd.Flags().Changed("help") {
+		// 如果使用 --version、--help 或 --update-asn，则不要求必须有目标参数
+		if versionFlag || cmd.Flags().Changed("help") || cmd.Flags().Changed("update-asn") {
 			return nil
 		}
 		// 否则要求必须有且仅有一个目标参数
@@ -47,8 +50,18 @@ var RootCmd = &cobra.Command{
 			fmt.Printf("NTR Version: %s, build date: %s\n", version, date)
 			return nil
 		}
+		// 处理 --update-asn 参数
+		if UPDATE_ASN {
+			fmt.Println("Updating ASN database...")
+			if err := asn.UpdateASNDatabase(); err != nil {
+				return fmt.Errorf("Failed to update ASN database: %v", err)
+			}
+			fmt.Println("ASN database updated successfully.")
+			return nil
+		}
+
 		m, ch, err := ntr.NewNTR(args[0], srcAddr, TIMEOUT, INTERVAL, HOP_SLEEP,
-			MAX_HOPS, MAX_UNKNOWN_HOPS, RING_BUFFER_SIZE, PTR_LOOKUP)
+			MAX_HOPS, MAX_UNKNOWN_HOPS, RING_BUFFER_SIZE, PTR_LOOKUP, ENABLE_ASN)
 		if err != nil {
 			return err
 		}
@@ -134,4 +147,6 @@ func init() {
 	RootCmd.Flags().BoolVarP(&PTR_LOOKUP, "ptr", "n", PTR_LOOKUP, "Reverse lookup on host")
 	RootCmd.Flags().BoolVar(&versionFlag, "version", false, "Print version")
 	RootCmd.Flags().StringVar(&srcAddr, "address", srcAddr, "The address to be bound the outgoing socket")
+	RootCmd.Flags().BoolVar(&ENABLE_ASN, "enable-asn", ENABLE_ASN, "Enable ASN lookup")
+	RootCmd.Flags().BoolVar(&UPDATE_ASN, "update-asn", UPDATE_ASN, "Update ASN database")
 }
