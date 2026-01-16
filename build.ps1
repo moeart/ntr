@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 
 # 设置编译版本
-$VERSION = "4.0.2026.0116"
+$VERSION = "5.0.2026.0116"
 $PROJECT_NAME = "ntr"
 $OUTPUT_DIR = "dist"
 $PROJECT_ROOT = "$(Get-Location)"
