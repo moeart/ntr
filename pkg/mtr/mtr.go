@@ -78,6 +78,7 @@ func (m *MTR) registerStatistic(ttl int, r icmp.ICMPReturn) *hop.HopStatistic {
 			Lost:           0,
 			Packets:        ring.New(m.ringBufferSize),
 			RingBufferSize: m.ringBufferSize,
+			Targets:        []string{}, // 初始化 Targets 字段，防止 nil 指针引用
 		}
 		m.Statistic[ttl] = s
 	}
@@ -328,22 +329,26 @@ func (m *MTR) Render(offset int) {
 	// 打印跳数信息
 	for i := 1; i <= len(m.Statistic); i++ {
 		m.mutex.RLock()
-		m.Statistic[i].Render(m.ptrLookup, width, destWidth)
+		hopStat := m.Statistic[i]
+		if hopStat != nil {
+			hopStat.Render(m.ptrLookup, width, destWidth)
+		}
 		m.mutex.RUnlock()
 
-		// 到达目标停止
-		if len(m.Statistic[i].Targets) > 0 && m.Statistic[i].Targets[0] == m.Address {
+		// 到达目标停止 - 检查 hopStat 和 Targets 是否有效
+		if hopStat != nil && hopStat.Targets != nil && len(hopStat.Targets) > 0 && hopStat.Targets[0] == m.Address {
 			break
 		}
 	}
 }
 
 func (m *MTR) Run(ch chan struct{}, count int) {
-	m.discover(ch, count)
+	// 忽略 count 参数，让程序持续运行直到用户按下 Ctrl+C
+	m.discover(ch)
 }
 
 // discover discovers all hops on the route
-func (m *MTR) discover(ch chan struct{}, count int) {
+func (m *MTR) discover(ch chan struct{}) {
 	// Sequences are incrementing as we don't won't to get old replys which might be from a previous run (where we timed out and continued).
 	// We can't use the process id as unique identifier as there might be multiple runs within a single binary, thus we use a fixed pseudo random number.
 	rand.Seed(time.Now().UnixNano())
@@ -352,38 +357,28 @@ func (m *MTR) discover(ch chan struct{}, count int) {
 
 	ipAddr := net.IPAddr{IP: net.ParseIP(m.Address)}
 
-	for i := 1; i <= count; i++ {
+	for {
 		time.Sleep(m.interval)
-
-		unknownHopsCount := 0
+		var wg sync.WaitGroup
 		for ttl := 1; ttl < m.maxHops; ttl++ {
-			seq++
-			time.Sleep(m.hopsleep)
-			var hopReturn icmp.ICMPReturn
-			var err error
-			if ipAddr.IP.To4() != nil {
-				hopReturn, err = icmp.SendDiscoverICMP(m.SrcAddress, &ipAddr, ttl, id, m.timeout, seq)
-			} else {
-				hopReturn, err = icmp.SendDiscoverICMPv6(m.SrcAddress, &ipAddr, ttl, id, m.timeout, seq)
-			}
-
-			m.mutex.Lock()
-			s := m.registerStatistic(ttl, hopReturn)
-			s.Dest = &ipAddr
-			s.PID = id
-			m.mutex.Unlock()
-			ch <- struct{}{}
-			if hopReturn.Addr == m.Address {
-				break
-			}
-			if err != nil || !hopReturn.Success {
-				unknownHopsCount++
-				if unknownHopsCount >= m.maxUnknownHops {
-					break
+			wg.Add(1)
+			go func(ttlVal int, seqVal int) {
+				defer wg.Done()
+				var hopReturn icmp.ICMPReturn
+				if ipAddr.IP.To4() != nil {
+					hopReturn, _ = icmp.SendDiscoverICMP(m.SrcAddress, &ipAddr, ttlVal, id, m.timeout, seqVal)
+				} else {
+					hopReturn, _ = icmp.SendDiscoverICMPv6(m.SrcAddress, &ipAddr, ttlVal, id, m.timeout, seqVal)
 				}
-				continue
-			}
-			unknownHopsCount = 0
+				m.mutex.Lock()
+				s := m.registerStatistic(ttlVal, hopReturn)
+				s.Dest = &ipAddr
+				s.PID = id
+				m.mutex.Unlock()
+				ch <- struct{}{}
+			}(ttl, seq+ttl)
 		}
+		seq += m.maxHops
+		wg.Wait()
 	}
 }

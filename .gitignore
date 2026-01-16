@@ -1,4 +1,4 @@
 *.swp
-/mtr-bin
-/mtr
+/data
 /dist
+*.exe

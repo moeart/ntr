@@ -16,8 +16,8 @@ var (
 	date    string
 
 	COUNT            = 5
-	TIMEOUT          = 5000 * time.Millisecond
-	INTERVAL         = 1000 * time.Millisecond
+	TIMEOUT          = 1000 * time.Millisecond
+	INTERVAL         = 200 * time.Millisecond
 	HOP_SLEEP        = time.Nanosecond
 	MAX_HOPS         = 25
 	MAX_UNKNOWN_HOPS = 10

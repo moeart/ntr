@@ -127,10 +127,20 @@ func (h *HopStatistic) packets() []*packet {
 }
 
 func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
+	if h == nil {
+		gm.Println("nil HopStatistic")
+		return
+	}
 	maxLength := width - 1
 
 	// 确定列格式，根据 IPv4/IPv6 调整 DESTINATION 列宽度
-	isIPv6 := h.Dest.IP.To4() == nil
+	var isIPv6 bool
+	if h.Dest != nil && h.Dest.IP != nil {
+		isIPv6 = h.Dest.IP.To4() == nil
+	} else {
+		isIPv6 = false
+	}
+
 	if destWidth == 0 {
 		if isIPv6 {
 			destWidth = 40
@@ -155,7 +165,7 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 
 	// 获取目标地址
 	var dest string
-	if h.Targets == nil || len(h.Targets) == 0 || h.Targets[0] == "" {
+	if h.Targets == nil || len(h.Targets) == 0 || (len(h.Targets) > 0 && h.Targets[0] == "") {
 		dest = "Request timed out"
 	} else {
 		dest = h.lookupAddr(ptrLookup, 0)
