@@ -327,18 +327,27 @@ func (m *NTR) Render(offset int) {
 	gm.Println(gm.Background(gm.Color(title, gm.BLACK), gm.WHITE))
 
 	// 打印跳数信息
+	foundTarget := false
 	for i := 1; i <= len(m.Statistic); i++ {
 		m.mutex.RLock()
 		hopStat := m.Statistic[i]
-		if hopStat != nil {
+		if hopStat != nil && !foundTarget {
+			// 检查当前跳点是否包含目标地址
+			for _, target := range hopStat.Targets {
+				if target == m.Address {
+					foundTarget = true
+					break
+				}
+			}
+
 			hopStat.Render(m.ptrLookup, width, destWidth)
+
+			if foundTarget {
+				m.mutex.RUnlock()
+				break
+			}
 		}
 		m.mutex.RUnlock()
-
-		// 到达目标停止 - 检查 hopStat 和 Targets 是否有效
-		if hopStat != nil && hopStat.Targets != nil && len(hopStat.Targets) > 0 && hopStat.Targets[0] == m.Address {
-			break
-		}
 	}
 }
 
