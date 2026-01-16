@@ -56,7 +56,7 @@ func GetDefaultConfig() *Config {
 			Enable:      true,
 		},
 		GeoIP: GeoIPConfig{
-			DownloadURL: "https://v6.gh-proxy.org/https://github.com/metowolf/qqwry.dat/releases/latest/download/qqwry.dat",
+			DownloadURL: "https://github.com/metowolf/qqwry.dat/releases/latest/download/qqwry.dat",
 			Enable:      true,
 			UseQQWry:    true,
 		},

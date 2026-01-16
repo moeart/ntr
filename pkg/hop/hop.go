@@ -178,6 +178,28 @@ func truncateString(s string, maxWidth int) string {
 	return truncated
 }
 
+// padString - Pad string to specified width, supporting Chinese characters (left alignment)
+func padString(s string, width int) string {
+	currentWidth := getStringDisplayWidth(s)
+	if currentWidth >= width {
+		return s
+	}
+
+	padding := width - currentWidth
+	return s + strings.Repeat(" ", padding)
+}
+
+// rightPadString - Pad string to specified width, supporting Chinese characters (right alignment)
+func rightPadString(s string, width int) string {
+	currentWidth := getStringDisplayWidth(s)
+	if currentWidth >= width {
+		return s
+	}
+
+	padding := width - currentWidth
+	return strings.Repeat(" ", padding) + s
+}
+
 func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 	if h == nil {
 		gm.Println("nil HopStatistic")
@@ -211,14 +233,16 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 	asnWidth := 7
 	locationWidth := maxLength - 3 - 2 - destWidth - 2 - lossWidth - sentWidth - lastWidth - bestWidth - avgWidth - wrstWidth - 2 - asnWidth - 1
 
-	// Build format string
-	format := fmt.Sprintf("%%3d  %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds  %%-%ds %%-%ds",
-		destWidth, lossWidth, sentWidth, lastWidth, bestWidth, avgWidth, wrstWidth, asnWidth, locationWidth)
+	// Build format string - removed unused variable
 
 	// Get destination address
 	var dest string
 	if h.Targets == nil || len(h.Targets) == 0 || (len(h.Targets) > 0 && h.Targets[0] == "") {
-		dest = "Request timed out"
+		if h.Lang == "zh" {
+			dest = "请求超时"
+		} else {
+			dest = "Request timed out"
+		}
 	} else {
 		dest = h.lookupAddr(ptrLookup, 0)
 	}
@@ -227,32 +251,37 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 	if getStringDisplayWidth(dest) > destWidth {
 		dest = truncateString(dest, destWidth)
 	}
+	dest = padString(dest, destWidth)
 
-	// Get delay values
-	var last, best, avg, wrst string
+	// Get delay values with right alignment
+	var last, best, avg, wrst, loss, sent string
 	if !h.Last.Success {
-		last = "*"
+		last = rightPadString("*", lastWidth)
 	} else {
-		last = fmt.Sprintf("%.0f", h.Last.Elapsed.Seconds()*1000)
+		last = rightPadString(fmt.Sprintf("%.0f", h.Last.Elapsed.Seconds()*1000), lastWidth)
 	}
 
 	if !h.Best.Success {
-		best = "*"
+		best = rightPadString("*", bestWidth)
 	} else {
-		best = fmt.Sprintf("%.0f", h.Best.Elapsed.Seconds()*1000)
+		best = rightPadString(fmt.Sprintf("%.0f", h.Best.Elapsed.Seconds()*1000), bestWidth)
 	}
 
 	if h.Sent-h.Lost == 0 {
-		avg = "*"
+		avg = rightPadString("*", avgWidth)
 	} else {
-		avg = fmt.Sprintf("%.0f", h.Avg())
+		avg = rightPadString(fmt.Sprintf("%.0f", h.Avg()), avgWidth)
 	}
 
 	if !h.Worst.Success {
-		wrst = "*"
+		wrst = rightPadString("*", wrstWidth)
 	} else {
-		wrst = fmt.Sprintf("%.0f", h.Worst.Elapsed.Seconds()*1000)
+		wrst = rightPadString(fmt.Sprintf("%.0f", h.Worst.Elapsed.Seconds()*1000), wrstWidth)
 	}
+
+	// Format loss percentage and sent count with right alignment
+	loss = rightPadString(fmt.Sprintf("%.0f", h.Loss()), lossWidth)
+	sent = rightPadString(fmt.Sprintf("%d", h.Sent), sentWidth)
 
 	// Get ASN information
 	var asnStr string
@@ -265,6 +294,7 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 	} else {
 		asnStr = "- -"
 	}
+	asnStr = padString(asnStr, asnWidth)
 
 	// Get LOCATION information
 	var locationStr string
@@ -297,13 +327,14 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 	if getStringDisplayWidth(locationStr) > locationWidth {
 		locationStr = truncateString(locationStr, locationWidth)
 	}
+	locationStr = padString(locationStr, locationWidth)
 
 	// Build row content
-	line := fmt.Sprintf(format,
+	line := fmt.Sprintf("%3d  %s %s %s %s %s %s %s  %s %s",
 		h.TTL,
 		dest,
-		fmt.Sprintf("%.0f", h.Loss()),
-		fmt.Sprintf("%d", h.Sent),
+		loss,
+		sent,
 		last,
 		best,
 		avg,

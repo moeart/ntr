@@ -305,6 +305,43 @@ func GetTerminalSize() (int, int) {
 	return width, height
 }
 
+// getStringDisplayWidth - Calculate string display width, Chinese characters count as 2, English characters count as 1
+func getStringDisplayWidth(s string) int {
+	width := 0
+	for _, r := range s {
+		if r >= 0x4e00 && r <= 0x9fff {
+			// Chinese characters occupy 2 widths
+			width += 2
+		} else {
+			// Other characters occupy 1 width
+			width += 1
+		}
+	}
+	return width
+}
+
+// padString - Pad string to specified width, supporting Chinese characters (left alignment)
+func padString(s string, width int) string {
+	currentWidth := getStringDisplayWidth(s)
+	if currentWidth >= width {
+		return s
+	}
+
+	padding := width - currentWidth
+	return s + strings.Repeat(" ", padding)
+}
+
+// rightPadString - Pad string to specified width, supporting Chinese characters (right alignment)
+func rightPadString(s string, width int) string {
+	currentWidth := getStringDisplayWidth(s)
+	if currentWidth >= width {
+		return s
+	}
+
+	padding := width - currentWidth
+	return strings.Repeat(" ", padding) + s
+}
+
 // Function to detect window size changes
 func monitorWindowResize(resizeChan chan bool) {
 	prevWidth, _ := GetTerminalSize()
@@ -372,34 +409,37 @@ func (m *NTR) Render(offset int) {
 	locationWidth := maxLength - 3 - 2 - destWidth - 2 - lossWidth - sentWidth - lastWidth - bestWidth - avgWidth - wrstWidth - 2 - asnWidth - 1
 
 	// Build format string
-	format := fmt.Sprintf("%%3s  %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds  %%-%ds %%-%ds",
-		destWidth, lossWidth, sentWidth, lastWidth, bestWidth, avgWidth, wrstWidth, asnWidth, locationWidth)
+	format := "%3s  %s %s %s %s %s %s %s  %s %s"
 
 	// Print title bar
-	// title := fmt.Sprintf(format,
-	// 	"#",
-	// 	"DESTINATION",
-	// 	"LOSS%",
-	// 	"SENT",
-	// 	"LAST",
-	// 	"BEST",
-	// 	"AVG",
-	// 	"WRST",
-	// 	"ASN",
-	// 	"LOCATION",
-	// )
-	title := fmt.Sprintf(format,
-		"#",
-		"目标主机",
-		"丢包%",
-		"发送",
-		"最近",
-		"最快",
-		"平均",
-		"最慢",
-		"ASN",
-		"IP位置信息",
-	)
+	var title string
+	if m.lang == "zh" {
+		title = fmt.Sprintf(format,
+			"#",
+			padString("目标主机", destWidth),
+			rightPadString("丢包%", lossWidth),
+			rightPadString("发送", sentWidth),
+			rightPadString("最近", lastWidth),
+			rightPadString("最快", bestWidth),
+			rightPadString("平均", avgWidth),
+			rightPadString("最慢", wrstWidth),
+			padString("ASN", asnWidth),
+			padString("IP位置信息", locationWidth),
+		)
+	} else {
+		title = fmt.Sprintf(format,
+			"#",
+			padString("DESTINATION", destWidth),
+			rightPadString("LOSS%", lossWidth),
+			rightPadString("SENT", sentWidth),
+			rightPadString("LAST", lastWidth),
+			rightPadString("BEST", bestWidth),
+			rightPadString("AVG", avgWidth),
+			rightPadString("WRST", wrstWidth),
+			padString("ASN", asnWidth),
+			padString("LOCATION", locationWidth),
+		)
+	}
 
 	// Title bar contrast highlight effect
 	gm.Println(gm.Background(gm.Color(title, gm.BLACK), gm.WHITE))

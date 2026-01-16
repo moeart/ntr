@@ -10,7 +10,7 @@ asn:
 # GeoIP (Geographic IP) configuration
 geoip:
   # Download URL for GeoIP database
-  download_url: "https://github.com/metowolf/qqwry.dat/releases/latest/download/qqwry.dat"
+  download_url: "https://v6.gh-proxy.org/https://github.com/metowolf/qqwry.dat/releases/latest/download/qqwry.dat"
   # Enable GeoIP lookup by default
   enable: true
   # Use QQWry database for GeoIP lookup (Chinese users)
