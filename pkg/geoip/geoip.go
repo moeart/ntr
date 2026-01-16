@@ -327,11 +327,21 @@ func downloadFileWithProgress(filePath, url string) error {
 
 // GetBinaryDatabasePath - Get binary database file path
 func GetBinaryDatabasePath() string {
-	// First check current directory
-	currentDir, _ := os.Getwd()
+	// Get executable path
+	execPath, err := os.Executable()
+	if err != nil {
+		// Fallback to current directory if cannot get executable path
+		currentDir, _ := os.Getwd()
+		return filepath.Join(currentDir, BinaryDatabaseFile)
+	}
+	
+	// Get directory of executable
+	execDir := filepath.Dir(execPath)
+	
+	// Check paths relative to executable directory first
 	paths := []string{
-		filepath.Join(currentDir, BinaryDatabaseFile),
-		filepath.Join(currentDir, "data", "geoip.bin"),
+		filepath.Join(execDir, BinaryDatabaseFile),
+		filepath.Join(execDir, "data", "geoip.bin"),
 		BinaryDatabaseFile,
 	}
 
@@ -341,8 +351,8 @@ func GetBinaryDatabasePath() string {
 		}
 	}
 
-	// If none exist, return default path
-	return filepath.Join(currentDir, BinaryDatabaseFile)
+	// If none exist, return default path relative to executable directory
+	return filepath.Join(execDir, BinaryDatabaseFile)
 }
 
 // IsInitialized - Check if database is initialized
