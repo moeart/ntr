@@ -10,6 +10,7 @@ import (
 
 	gm "github.com/buger/goterm"
 	"github.com/moeart/ntr/pkg/asn"
+	"github.com/moeart/ntr/pkg/geoip"
 	"github.com/moeart/ntr/pkg/icmp"
 )
 
@@ -29,6 +30,7 @@ type HopStatistic struct {
 	RingBufferSize int
 	dnsCache       map[string]string
 	Asns           *asn.ASNs
+	GeoIP          *geoip.GeoIP
 }
 
 type packet struct {
@@ -216,6 +218,23 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 		asnStr = "- -"
 	}
 
+	// 获取 LOCATION 信息
+	var locationStr string
+	if h.GeoIP != nil && h.GeoIP.IsInitialized() && h.Targets != nil && len(h.Targets) > 0 && h.Targets[0] != "" {
+		if loc, err := h.GeoIP.LookupByIP(h.Targets[0]); err == nil && loc != nil {
+			locationStr = loc.Format()
+		} else {
+			locationStr = "- -"
+		}
+	} else {
+		locationStr = "- -"
+	}
+
+	// 截断位置信息以适应列宽
+	if len(locationStr) > locationWidth {
+		locationStr = locationStr[:locationWidth]
+	}
+
 	// 构建行内容
 	line := fmt.Sprintf(format,
 		h.TTL,
@@ -226,8 +245,8 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 		best,
 		avg,
 		wrst,
-		asnStr, // ASN 列
-		"",     // LOCATION 列暂时留空
+		asnStr,      // ASN 列
+		locationStr, // LOCATION 列
 	)
 
 	// 确保行内容不超过终端宽度

@@ -8,6 +8,7 @@ import (
 	tm "github.com/buger/goterm"
 	pj "github.com/hokaccha/go-prettyjson"
 	"github.com/moeart/ntr/pkg/asn"
+	"github.com/moeart/ntr/pkg/geoip"
 	"github.com/moeart/ntr/pkg/ntr"
 	"github.com/spf13/cobra"
 )
@@ -29,14 +30,16 @@ var (
 	versionFlag      bool
 	ENABLE_ASN       = false
 	UPDATE_ASN       = false
+	ENABLE_GEOIP     = false
+	UPDATE_GEOIP     = false
 )
 
 // rootCmd represents the root command
 var RootCmd = &cobra.Command{
 	Use: "ntr TARGET",
 	Args: func(cmd *cobra.Command, args []string) error {
-		// 如果使用 --version、--help 或 --update-asn，则不要求必须有目标参数
-		if versionFlag || cmd.Flags().Changed("help") || cmd.Flags().Changed("update-asn") {
+		// 如果使用 --version、--help、--update-asn 或 --update-geoip，则不要求必须有目标参数
+		if versionFlag || cmd.Flags().Changed("help") || cmd.Flags().Changed("update-asn") || cmd.Flags().Changed("update-geoip") {
 			return nil
 		}
 		// 否则要求必须有且仅有一个目标参数
@@ -60,8 +63,18 @@ var RootCmd = &cobra.Command{
 			return nil
 		}
 
+		// 处理 --update-geoip 参数
+		if UPDATE_GEOIP {
+			fmt.Println("Updating GeoIP database...")
+			if err := geoip.UpdateGeoIPDatabase(); err != nil {
+				return fmt.Errorf("Failed to update GeoIP database: %v", err)
+			}
+			fmt.Println("GeoIP database updated successfully.")
+			return nil
+		}
+
 		m, ch, err := ntr.NewNTR(args[0], srcAddr, TIMEOUT, INTERVAL, HOP_SLEEP,
-			MAX_HOPS, MAX_UNKNOWN_HOPS, RING_BUFFER_SIZE, PTR_LOOKUP, ENABLE_ASN)
+			MAX_HOPS, MAX_UNKNOWN_HOPS, RING_BUFFER_SIZE, PTR_LOOKUP, ENABLE_ASN, ENABLE_GEOIP)
 		if err != nil {
 			return err
 		}
@@ -149,4 +162,6 @@ func init() {
 	RootCmd.Flags().StringVar(&srcAddr, "address", srcAddr, "The address to be bound the outgoing socket")
 	RootCmd.Flags().BoolVar(&ENABLE_ASN, "enable-asn", ENABLE_ASN, "Enable ASN lookup")
 	RootCmd.Flags().BoolVar(&UPDATE_ASN, "update-asn", UPDATE_ASN, "Update ASN database")
+	RootCmd.Flags().BoolVar(&ENABLE_GEOIP, "enable-geoip", ENABLE_GEOIP, "Enable GeoIP (location) lookup")
+	RootCmd.Flags().BoolVar(&UPDATE_GEOIP, "update-geoip", UPDATE_GEOIP, "Update GeoIP (location) database")
 }
