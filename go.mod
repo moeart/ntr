@@ -1,6 +1,6 @@
 module github.com/moeart/ntr
 
-go 1.25.5
+go 1.25
 
 require (
 	github.com/buger/goterm v0.0.0-20181115115552-c206103e1f37
