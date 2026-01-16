@@ -23,6 +23,12 @@ import (
 	"github.com/moeart/ntr/pkg/icmp"
 )
 
+// 工具名称和版权信息，定义为全局变量以便其他包访问
+var (
+	ToolName      = "NTR - MoeArt's Network Traceroute"
+	ToolCopyright = "(c)2016-2026 MoeArt OpenSource, www.acgdraw.com"
+)
+
 type NTR struct {
 	SrcAddress     string `json:"source"`
 	mutex          *sync.RWMutex
@@ -319,28 +325,26 @@ func (m *NTR) Render(offset int) {
 	maxLength := width - 3 // 防止溢出
 
 	// 打印工具信息
-	toolName := "NTR - MoeArt's Network Traceroute - Special Edition for Laba Festival"
-	toolCopyright := "(c)2020 - 2025 MoeArt OpenSource, www.acgdraw.com"
 
 	// 居中打印工具名称和版权信息
-	padding := (maxLength - len(toolName)) / 2
+	padding := (maxLength - len(ToolName)) / 2
 	if padding > 0 {
-		gm.Printf("%*s%s%*s\n", padding, "", toolName, padding, "")
+		gm.Printf("%*s%s%*s\n", padding, "", ToolName, padding, "")
 	} else {
-		gm.Printf("%s\n", toolName[:maxLength])
+		gm.Printf("%s\n", ToolName[:maxLength])
 	}
 
-	padding = (maxLength - len(toolCopyright)) / 2
+	padding = (maxLength - len(ToolCopyright)) / 2
 	if padding > 0 {
-		gm.Printf("%*s%s%*s\n", padding, "", toolCopyright, padding, "")
+		gm.Printf("%*s%s%*s\n", padding, "", ToolCopyright, padding, "")
 	} else {
-		gm.Printf("%s\n", toolCopyright[:maxLength])
+		gm.Printf("%s\n", ToolCopyright[:maxLength])
 	}
 
 	// 打印信息行
-	infoLeft := fmt.Sprintf("Dest: %s", m.Address)
+	infoLeft := fmt.Sprintf("DEST: %s", m.Address)
 	startTime := time.Now().Format("2006-01-02 15:04:05")
-	infoRight := fmt.Sprintf("ST: %s", startTime)
+	infoRight := fmt.Sprintf("START: %s", startTime)
 	paddingRight := maxLength - len(infoLeft) - len(infoRight)
 	if paddingRight > 0 {
 		gm.Printf("%s%s%s\n", infoLeft, strings.Repeat(" ", paddingRight), infoRight)

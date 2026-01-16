@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -40,11 +41,17 @@ var (
 
 // rootCmd represents the root command
 var RootCmd = &cobra.Command{
-	Use: "ntr TARGET",
+	Use:          "ntr TARGET",
+	SilenceUsage: true, // 命令执行失败时不自动显示帮助信息
 	Args: func(cmd *cobra.Command, args []string) error {
 		// 如果使用 --version、--help、--update-asn 或 --update-geoip，则不要求必须有目标参数
 		if versionFlag || cmd.Flags().Changed("help") || cmd.Flags().Changed("update-asn") || cmd.Flags().Changed("update-geoip") {
 			return nil
+		}
+		// 如果没有参数，则显示帮助信息
+		if len(args) == 0 {
+			cmd.Help()
+			os.Exit(0)
 		}
 		// 否则要求必须有且仅有一个目标参数
 		if len(args) != 1 {
@@ -53,7 +60,20 @@ var RootCmd = &cobra.Command{
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// 检查是否请求了帮助
+		if cmd.Flags().Changed("help") {
+			// 输出标题和版权信息
+			fmt.Printf("%s\n", ntr.ToolName)
+			fmt.Printf("%s\n", ntr.ToolCopyright)
+			fmt.Println()
+			// 调用默认的帮助函数
+			cmd.Help()
+			return nil
+		}
+
 		if versionFlag {
+			fmt.Printf("%s\n", ntr.ToolName)
+			fmt.Printf("%s\n", ntr.ToolCopyright)
 			fmt.Printf("NTR Version: %s, build date: %s\n", version, date)
 			return nil
 		}
@@ -166,6 +186,35 @@ func watchWindowSize() {
 }
 
 func init() {
+	// 设置自定义的帮助信息格式，包含标题和版权信息
+	RootCmd.SetUsageTemplate(`{{printf "%s" "NTR - MoeArt's Network Traceroute"}}
+{{printf "%s" "(c)2016-2026 MoeArt OpenSource, www.acgdraw.com"}}
+
+Usage:
+  {{.UseLine}}
+
+{{if .HasAvailableSubCommands}}
+Available Commands:
+{{range .Commands}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
+
+{{end}}{{if .HasAvailableLocalFlags}}
+Flags:
+{{.LocalFlags.FlagUsages | trimRightSpace}}
+
+{{end}}{{if .HasAvailableInheritedFlags}}
+Global Flags:
+{{.InheritedFlags.FlagUsages | trimRightSpace}}
+
+{{end}}{{if .HasHelpSubCommands}}
+Additional help topics:
+{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
+  {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}
+
+{{end}}{{if .HasAvailableSubCommands}}
+Use "{{.CommandPath}} [command] --help" for more information about a command.
+{{end}}`)
+
 	RootCmd.Flags().StringVarP(&srcAddr, "address", "s", srcAddr, "The address to bind the outgoing socket to")
 	// 添加短选项 -a 和 -g
 	var disableASN bool
@@ -180,6 +229,13 @@ func init() {
 	var disableGeoIP bool
 	RootCmd.Flags().BoolVarP(&disableGeoIP, "disable-geoip", "g", false, "Disable IP to geographic location query.")
 	RootCmd.PreRun = func(cmd *cobra.Command, args []string) {
+		// 检查是否请求了帮助
+		if cmd.Flags().Changed("help") {
+			// 输出标题和版权信息
+			fmt.Printf("%s\n", ntr.ToolName)
+			fmt.Printf("%s\n", ntr.ToolCopyright)
+			fmt.Println()
+		}
 		if disableASN {
 			ENABLE_ASN = false
 		}
