@@ -7,8 +7,8 @@ import (
 
 	tm "github.com/buger/goterm"
 	pj "github.com/hokaccha/go-prettyjson"
+	"github.com/moeart/ntr/pkg/ntr"
 	"github.com/spf13/cobra"
-	"github.com/tonobo/mtr/pkg/mtr"
 )
 
 var (
@@ -30,7 +30,7 @@ var (
 
 // rootCmd represents the root command
 var RootCmd = &cobra.Command{
-	Use: "mtr TARGET",
+	Use: "ntr TARGET",
 	Args: func(cmd *cobra.Command, args []string) error {
 		// 如果使用 --version 或 --help，则不要求必须有目标参数
 		if versionFlag || cmd.Flags().Changed("help") {
@@ -44,10 +44,10 @@ var RootCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if versionFlag {
-			fmt.Printf("MTR Version: %s, build date: %s\n", version, date)
+			fmt.Printf("NTR Version: %s, build date: %s\n", version, date)
 			return nil
 		}
-		m, ch, err := mtr.NewMTR(args[0], srcAddr, TIMEOUT, INTERVAL, HOP_SLEEP,
+		m, ch, err := ntr.NewNTR(args[0], srcAddr, TIMEOUT, INTERVAL, HOP_SLEEP,
 			MAX_HOPS, MAX_UNKNOWN_HOPS, RING_BUFFER_SIZE, PTR_LOOKUP)
 		if err != nil {
 			return err
@@ -101,7 +101,7 @@ var RootCmd = &cobra.Command{
 // 创建窗口大小变化检测通道
 var resizeChan = make(chan bool, 1)
 
-func render(m *mtr.MTR) {
+func render(m *ntr.NTR) {
 	tm.Clear()
 	tm.MoveCursor(1, 1)
 	m.Render(1)
@@ -111,10 +111,10 @@ func render(m *mtr.MTR) {
 // 监听窗口大小变化的函数
 func watchWindowSize() {
 	// 使用轮询方式检测窗口大小变化
-	prevWidth, _ := mtr.GetTerminalSize()
+	prevWidth, _ := ntr.GetTerminalSize()
 	for {
 		time.Sleep(200 * time.Millisecond) // 每 200ms 检查一次
-		currWidth, _ := mtr.GetTerminalSize()
+		currWidth, _ := ntr.GetTerminalSize()
 		if currWidth != prevWidth {
 			resizeChan <- true
 			prevWidth = currWidth

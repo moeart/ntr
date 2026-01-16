@@ -9,7 +9,7 @@ import (
 	"time"
 
 	gm "github.com/buger/goterm"
-	"github.com/tonobo/mtr/pkg/icmp"
+	"github.com/moeart/ntr/pkg/icmp"
 )
 
 type HopStatistic struct {

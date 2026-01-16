@@ -1,4 +1,4 @@
-package mtr
+package ntr
 
 import (
 	"bytes"
@@ -17,11 +17,11 @@ import (
 	"unsafe"
 
 	gm "github.com/buger/goterm"
-	"github.com/tonobo/mtr/pkg/hop"
-	"github.com/tonobo/mtr/pkg/icmp"
+	"github.com/moeart/ntr/pkg/hop"
+	"github.com/moeart/ntr/pkg/icmp"
 )
 
-type MTR struct {
+type NTR struct {
 	SrcAddress     string `json:"source"`
 	mutex          *sync.RWMutex
 	timeout        time.Duration
@@ -35,8 +35,8 @@ type MTR struct {
 	ptrLookup      bool
 }
 
-func NewMTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
-	hopsleep time.Duration, maxHops, maxUnknownHops, ringBufferSize int, ptr bool) (*MTR, chan struct{}, error) {
+func NewNTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
+	hopsleep time.Duration, maxHops, maxUnknownHops, ringBufferSize int, ptr bool) (*NTR, chan struct{}, error) {
 	if net.ParseIP(addr) == nil {
 		addrs, err := net.LookupHost(addr)
 		if err != nil || len(addrs) == 0 {
@@ -51,7 +51,7 @@ func NewMTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
 			srcAddr = "::"
 		}
 	}
-	return &MTR{
+	return &NTR{
 		SrcAddress:     srcAddr,
 		interval:       interval,
 		timeout:        timeout,
@@ -66,7 +66,7 @@ func NewMTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
 	}, make(chan struct{}), nil
 }
 
-func (m *MTR) registerStatistic(ttl int, r icmp.ICMPReturn) *hop.HopStatistic {
+func (m *NTR) registerStatistic(ttl int, r icmp.ICMPReturn) *hop.HopStatistic {
 	s, ok := m.Statistic[ttl]
 	if !ok {
 		s = &hop.HopStatistic{
@@ -250,7 +250,7 @@ func monitorWindowResize(resizeChan chan bool) {
 	}
 }
 
-func (m *MTR) Render(offset int) {
+func (m *NTR) Render(offset int) {
 
 	// 获取终端尺寸
 	width, _ := GetTerminalSize()
@@ -342,13 +342,13 @@ func (m *MTR) Render(offset int) {
 	}
 }
 
-func (m *MTR) Run(ch chan struct{}, count int) {
+func (m *NTR) Run(ch chan struct{}, count int) {
 	// 忽略 count 参数，让程序持续运行直到用户按下 Ctrl+C
 	m.discover(ch)
 }
 
 // discover discovers all hops on the route
-func (m *MTR) discover(ch chan struct{}) {
+func (m *NTR) discover(ch chan struct{}) {
 	// Sequences are incrementing as we don't won't to get old replys which might be from a previous run (where we timed out and continued).
 	// We can't use the process id as unique identifier as there might be multiple runs within a single binary, thus we use a fixed pseudo random number.
 	rand.Seed(time.Now().UnixNano())

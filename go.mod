@@ -1,4 +1,4 @@
-module github.com/tonobo/mtr
+module github.com/moeart/ntr
 
 go 1.25.5
 
