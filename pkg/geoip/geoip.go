@@ -65,8 +65,8 @@ func UpdateGeoIPDatabase() error {
 	return nil
 }
 
-// isSpecialIP 检查IP地址是否属于特殊地址段并返回对应的Location
-func isSpecialIP(ipStr string) *Location {
+// isSpecialIP 检查是否是特殊IP地址并返回对应Location
+func isSpecialIP(ipStr string, lang string) *Location {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return nil
@@ -81,86 +81,97 @@ func isSpecialIP(ipStr string) *Location {
 
 	// 127.*.*.* 显示为本机环回地址
 	if b1 == 127 {
-		return &Location{
-			Country: "本机环回地址",
+		if lang == "en" {
+			return &Location{Country: "Loopback Address"}
 		}
+		return &Location{Country: "本机环回地址"}
 	}
 
 	// 10.*.*.* 显示为本地局域网
 	if b1 == 10 {
-		return &Location{
-			Country: "本地局域网",
+		if lang == "en" {
+			return &Location{Country: "Local Area Network (A-class)"}
 		}
+		return &Location{Country: "本地局域网"}
 	}
 
 	// 172.16.*.* 到 172.31.*.*（整个B类）显示为本地局域网
 	if b1 == 172 && (b2 >= 16 && b2 <= 31) {
-		return &Location{
-			Country: "本地局域网",
+		if lang == "en" {
+			return &Location{Country: "Local Area Network (B-class)"}
 		}
+		return &Location{Country: "本地局域网"}
 	}
 
 	// 192.168.*.* 显示为本地局域网
 	if b1 == 192 && b2 == 168 {
 		// 192.168.1-255.1 显示为本地局域网网关
 		if b4 == 1 && b3 >= 1 && b3 <= 255 {
-			return &Location{
-				Country: "本地局域网网关",
+			if lang == "en" {
+				return &Location{Country: "Local Area Network Gateway"}
 			}
+			return &Location{Country: "本地局域网网关"}
 		}
-		return &Location{
-			Country: "本地局域网",
+		if lang == "en" {
+			return &Location{Country: "Local Area Network (C-class)"}
 		}
+		return &Location{Country: "本地局域网"}
 	}
 
 	// 169.254.*.* 显示为零配置局域网
 	if b1 == 169 && b2 == 254 {
-		return &Location{
-			Country: "零配置局域网",
+		if lang == "en" {
+			return &Location{Country: "Zero-Configuration Local Area Network"}
 		}
+		return &Location{Country: "零配置局域网"}
 	}
 
 	// 11.*.*.* 显示为IDC机房内网
 	if b1 == 11 {
-		return &Location{
-			Country: "IDC机房内网",
+		if lang == "en" {
+			return &Location{Country: "IDC Intranet"}
 		}
+		return &Location{Country: "IDC机房内网"}
 	}
 
 	// 134.128-255.*.* 显示为中国电信 DCN内网
 	if b1 == 134 && (b2 >= 128 && b2 <= 255) {
-		return &Location{
-			Country: "中国电信 DCN内网",
+		if lang == "en" {
+			return &Location{Country: "China Telecom DCN Intranet"}
 		}
+		return &Location{Country: "中国电信 DCN内网"}
 	}
 
 	// 220.110-111.*.* 显示为萌信通 DCN内网
 	if b1 == 220 && (b2 == 110 || b2 == 111) {
-		return &Location{
-			Country: "萌信通 DCN内网",
+		if lang == "en" {
+			return &Location{Country: "Mengxintong DCN Intranet"}
 		}
+		return &Location{Country: "萌信通 DCN内网"}
 	}
 
 	// 100.64-127.*.* 显示为运营商CGNAT内网
 	if b1 == 100 && (b2 >= 64 && b2 <= 127) {
-		return &Location{
-			Country: "运营商CGNAT内网",
+		if lang == "en" {
+			return &Location{Country: "Carrier CGNAT Intranet"}
 		}
+		return &Location{Country: "运营商CGNAT内网"}
 	}
 
 	return nil
 }
 
-// LookupByIP 查找与 IP 对应的地理位置
-func (g *GeoIP) LookupByIP(ipStr string) (*Location, error) {
+// LookupByIP 查询IP地址信息
+func (g *GeoIP) LookupByIP(ipStr string, lang string, useQQWry bool) (*Location, error) {
 	// 首先检查是否是特殊IP地址
-	specialLoc := isSpecialIP(ipStr)
+	specialLoc := isSpecialIP(ipStr, lang)
 	if specialLoc != nil {
 		return specialLoc, nil
 	}
 
-	if !g.initialized {
-		return nil, fmt.Errorf("GeoIP database not initialized")
+	// 根据条件决定是否使用QQWry查询
+	if !useQQWry || !g.initialized {
+		return &Location{Country: "N/A"}, nil
 	}
 
 	location, err := qqwry.QueryIP(ipStr)
@@ -186,16 +197,15 @@ type Location struct {
 	ISP      string
 }
 
-// Format 格式化显示地理位置信息
-// 中国范围内不显示国家，其他国家显示国家
-// 特殊IP地址段（如局域网、内网等）直接显示Country字段内容
-func (l *Location) Format() string {
+// Format 格式化输出
+func (l *Location) Format(lang string) string {
 	var parts []string
 
-	// 检查是否是特殊IP地址段（这些地址的Country字段包含了完整的描述）
-	specialCases := []string{
-		"本地局域网", "本地局域网网关", "零配置局域网", "本机环回地址",
-		"IDC机房内网", "中国电信 DCN内网", "萌信通 DCN内网", "运营商CGNAT内网"}
+	// 检查是否是特殊IP地址（这些地址的Country字段包含了完整的描述）
+	specialCases := []string{"本地局域网", "本地局域网网关", "零配置局域网", "本机环回地址", "IDC机房内网", "中国电信 DCN内网", "萌信通 DCN内网", "运营商CGNAT内网"}
+	if lang == "en" {
+		specialCases = []string{"Local Area Network", "Loopback Address", "Zero-Configuration Local Area Network", "IDC Intranet", "China Telecom DCN Intranet", "Mengxintong DCN Intranet", "Carrier CGNAT Intranet"}
+	}
 
 	for _, special := range specialCases {
 		if strings.Contains(l.Country, special) {

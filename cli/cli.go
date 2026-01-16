@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,10 +29,11 @@ var (
 	jsonFmt          = false
 	srcAddr          = ""
 	versionFlag      bool
-	ENABLE_ASN       = false
+	ENABLE_ASN       = true
 	UPDATE_ASN       = false
-	ENABLE_GEOIP     = false
+	ENABLE_GEOIP     = true
 	UPDATE_GEOIP     = false
+	LANG             = "zh" // 默认语言为中文
 )
 
 // rootCmd represents the root command
@@ -73,8 +75,16 @@ var RootCmd = &cobra.Command{
 			return nil
 		}
 
+		// 检测时区，判断是否使用QQWry
+		useQQWry := true
+		zone, _ := time.Now().Zone()
+		// 中国时区通常包含 "CST"（China Standard Time）
+		if !strings.Contains(strings.ToUpper(zone), "CST") || LANG == "en" {
+			useQQWry = false
+		}
+
 		m, ch, err := ntr.NewNTR(args[0], srcAddr, TIMEOUT, INTERVAL, HOP_SLEEP,
-			MAX_HOPS, MAX_UNKNOWN_HOPS, RING_BUFFER_SIZE, PTR_LOOKUP, ENABLE_ASN, ENABLE_GEOIP)
+			MAX_HOPS, MAX_UNKNOWN_HOPS, RING_BUFFER_SIZE, PTR_LOOKUP, ENABLE_ASN, ENABLE_GEOIP, LANG, useQQWry)
 		if err != nil {
 			return err
 		}
@@ -149,19 +159,44 @@ func watchWindowSize() {
 }
 
 func init() {
-	RootCmd.Flags().IntVarP(&COUNT, "count", "c", COUNT, "Amount of pings per target")
-	RootCmd.Flags().DurationVarP(&TIMEOUT, "timeout", "t", TIMEOUT, "ICMP reply timeout")
-	RootCmd.Flags().DurationVarP(&INTERVAL, "interval", "i", INTERVAL, "Wait time between icmp packets before sending new one")
-	RootCmd.Flags().DurationVar(&HOP_SLEEP, "hop-sleep", HOP_SLEEP, "Wait time between pinging next hop")
-	RootCmd.Flags().IntVar(&MAX_HOPS, "max-hops", MAX_HOPS, "Maximal TTL count")
-	RootCmd.Flags().IntVar(&MAX_UNKNOWN_HOPS, "max-unknown-hops", MAX_UNKNOWN_HOPS, "Maximal hops that do not reply before stopping to look")
-	RootCmd.Flags().IntVar(&RING_BUFFER_SIZE, "buffer-size", RING_BUFFER_SIZE, "Cached packet buffer size")
-	RootCmd.Flags().BoolVar(&jsonFmt, "json", jsonFmt, "Print json results")
-	RootCmd.Flags().BoolVarP(&PTR_LOOKUP, "ptr", "n", PTR_LOOKUP, "Reverse lookup on host")
-	RootCmd.Flags().BoolVar(&versionFlag, "version", false, "Print version")
-	RootCmd.Flags().StringVar(&srcAddr, "address", srcAddr, "The address to be bound the outgoing socket")
-	RootCmd.Flags().BoolVar(&ENABLE_ASN, "enable-asn", ENABLE_ASN, "Enable ASN lookup")
-	RootCmd.Flags().BoolVar(&UPDATE_ASN, "update-asn", UPDATE_ASN, "Update ASN database")
-	RootCmd.Flags().BoolVar(&ENABLE_GEOIP, "enable-geoip", ENABLE_GEOIP, "Enable GeoIP (location) lookup")
-	RootCmd.Flags().BoolVar(&UPDATE_GEOIP, "update-geoip", UPDATE_GEOIP, "Update GeoIP (location) database")
+	RootCmd.Flags().StringVarP(&srcAddr, "address", "s", srcAddr, "The address to bind the outgoing socket to")
+	// 添加短选项 -a 和 -g
+	var disableASN bool
+	RootCmd.Flags().BoolVarP(&disableASN, "disable-asn", "a", false, "Disable IP to BGP AS number query.")
+	// 添加验证函数来修改 ENABLE_ASN 变量
+	RootCmd.PreRun = func(cmd *cobra.Command, args []string) {
+		if disableASN {
+			ENABLE_ASN = false
+		}
+	}
+
+	var disableGeoIP bool
+	RootCmd.Flags().BoolVarP(&disableGeoIP, "disable-geoip", "g", false, "Disable IP to geographic location query.")
+	RootCmd.PreRun = func(cmd *cobra.Command, args []string) {
+		if disableASN {
+			ENABLE_ASN = false
+		}
+		if disableGeoIP {
+			ENABLE_GEOIP = false
+		}
+	}
+
+	RootCmd.Flags().DurationVarP(&INTERVAL, "interval", "i", INTERVAL, "Seconds between each traceroute. (min:1)")
+	// 添加 IPv4 和 IPv6 选项
+	var ipv4 bool
+	RootCmd.Flags().BoolVarP(&ipv4, "ipv4", "4", false, "Force using IPv4 protocol")
+	var ipv6 bool
+	RootCmd.Flags().BoolVarP(&ipv6, "ipv6", "6", false, "Force using IPv6 protocol")
+	RootCmd.Flags().BoolVarP(&jsonFmt, "json", "j", jsonFmt, "Print JSON formatted results")
+	RootCmd.Flags().IntVarP(&MAX_HOPS, "max-hop", "m", MAX_HOPS, "Maximum number of hops to try. (min:1, max:255)")
+	RootCmd.Flags().DurationVarP(&TIMEOUT, "timeout", "t", TIMEOUT, "Stop waiting for router response in seconds. (min:1)")
+
+	// 添加域名验证选项
+	var unverifyTLD bool
+	RootCmd.Flags().BoolVarP(&unverifyTLD, "unverify-tld", "D", false, "Disable Domain Available Verification.")
+
+	RootCmd.Flags().BoolVarP(&UPDATE_ASN, "update-asn", "U", UPDATE_ASN, "Update ASN database from online source.")
+	RootCmd.Flags().BoolVarP(&UPDATE_GEOIP, "update-geoip", "G", UPDATE_GEOIP, "Update GeoIP database from online source.")
+	RootCmd.Flags().StringVarP(&LANG, "lang", "L", LANG, "Set language (zh for Chinese, en for English)")
+	RootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print version information")
 }

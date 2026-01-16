@@ -39,10 +39,12 @@ type NTR struct {
 	asns           *asn.ASNs
 	enableGeoIP    bool
 	geoip          *geoip.GeoIP
+	lang           string
+	useQQWry       bool
 }
 
 func NewNTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
-	hopsleep time.Duration, maxHops, maxUnknownHops, ringBufferSize int, ptr bool, enableAsn bool, enableGeoIP bool) (*NTR, chan struct{}, error) {
+	hopsleep time.Duration, maxHops, maxUnknownHops, ringBufferSize int, ptr bool, enableAsn bool, enableGeoIP bool, lang string, useQQWry bool) (*NTR, chan struct{}, error) {
 	if net.ParseIP(addr) == nil {
 		addrs, err := net.LookupHost(addr)
 		if err != nil || len(addrs) == 0 {
@@ -72,6 +74,8 @@ func NewNTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
 		ptrLookup:      ptr,
 		enableAsn:      enableAsn,
 		enableGeoIP:    enableGeoIP,
+		lang:           lang,
+		useQQWry:       useQQWry,
 	}
 
 	if enableAsn {
@@ -110,6 +114,8 @@ func (m *NTR) registerStatistic(ttl int, r icmp.ICMPReturn) *hop.HopStatistic {
 			Targets:        []string{}, // 初始化 Targets 字段，防止 nil 指针引用
 			Asns:           m.asns,     // 设置 ASNs 字段
 			GeoIP:          m.geoip,    // 设置 GeoIP 字段
+			Lang:           m.lang,
+			UseQQWry:       m.useQQWry,
 		}
 		m.Statistic[ttl] = s
 	}

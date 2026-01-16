@@ -31,6 +31,8 @@ type HopStatistic struct {
 	dnsCache       map[string]string
 	Asns           *asn.ASNs
 	GeoIP          *geoip.GeoIP
+	Lang           string
+	UseQQWry       bool
 }
 
 type packet struct {
@@ -221,8 +223,8 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 	// 获取 LOCATION 信息
 	var locationStr string
 	if h.GeoIP != nil && h.GeoIP.IsInitialized() && h.Targets != nil && len(h.Targets) > 0 && h.Targets[0] != "" {
-		if loc, err := h.GeoIP.LookupByIP(h.Targets[0]); err == nil && loc != nil {
-			locationStr = loc.Format()
+		if loc, err := h.GeoIP.LookupByIP(h.Targets[0], h.Lang, h.UseQQWry); err == nil && loc != nil {
+			locationStr = loc.Format(h.Lang)
 		} else {
 			locationStr = "- -"
 		}
