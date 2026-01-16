@@ -1,0 +1,77 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go
+
+on:
+  push:
+    branches: [ "golang" ]
+  pull_request:
+    branches: [ "golang" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.20'
+
+    - name: Build
+      run: go build -v ./...
+
+    - name: Test
+      run: go test -v ./...
+
+  build-cross-platform:
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      matrix:
+        goos:
+          - linux
+          - windows
+          - darwin
+        goarch:
+          - 386
+          - amd64
+          - arm
+          - arm64
+        exclude:
+          - goos: windows
+            goarch: arm
+          - goos: darwin
+            goarch: 386
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.20'
+
+    - name: Determine file extension
+      id: ext
+      run: |
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          echo "::set-output name=extension::.exe"
+        else
+          echo "::set-output name=extension::"
+        fi
+
+    - name: Build cross-platform
+      run: |
+        VERSION="5.0.2026.0116"
+        BUILD_DATE=$(date +"%Y-%m-%d")
+        OUTPUT_NAME="ntr-${{ matrix.goos }}-${{ matrix.goarch }}${{ steps.ext.outputs.extension }}"
+        go build -o "dist/$OUTPUT_NAME" -ldflags "-X 'github.com/moeart/ntr/cli.version=$VERSION' -X 'github.com/moeart/ntr/cli.date=$BUILD_DATE'" .
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ntr-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: dist/ntr-${{ matrix.goos }}-${{ matrix.goarch }}${{ steps.ext.outputs.extension }}
