@@ -129,7 +129,7 @@ var RootCmd = &cobra.Command{
 			fmt.Println(string(s))
 			return nil
 		}
-		fmt.Println("Start:", time.Now())
+
 		tm.Clear()
 		mu := &sync.Mutex{}
 

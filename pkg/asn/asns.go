@@ -62,13 +62,9 @@ func NewASNs() (*ASNs, error) {
 	filePath := GetBinaryDatabasePath()
 	err := asns.loadFromBinaryMMAP(filePath)
 	if err == nil {
-		log.Printf("Successfully loaded ASN database from binary file (records: %d)", asns.recordCount)
+
 		return asns, nil
 	}
-
-	log.Printf("Warning: Could not load ASN database from binary file: %v", err)
-	log.Println("ASN data will not be available. To enable ASN lookups, please run the update command.")
-	log.Println("You can manually update the database by calling UpdateASNDatabase()")
 
 	// 返回一个空的ASNs，这样程序可以正常运行，只是查询不到ASN
 	asns.initialized.Store(true)

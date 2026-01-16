@@ -34,14 +34,10 @@ func NewGeoIP() (*GeoIP, error) {
 	filePath := GetBinaryDatabasePath()
 	err := qqwry.LoadFile(filePath)
 	if err == nil {
-		log.Println("Successfully loaded GeoIP database")
+
 		geoip.initialized = true
 		return geoip, nil
 	}
-
-	log.Printf("Warning: Could not load GeoIP database: %v", err)
-	log.Println("GeoIP data will not be available. To enable GeoIP lookups, please run the update command.")
-	log.Println("You can manually update the database by calling UpdateGeoIPDatabase()")
 
 	geoip.initialized = false
 	return geoip, nil
