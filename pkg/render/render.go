@@ -3,15 +3,19 @@ package render
 import (
 	"fmt"
 	"net"
+	"os"
+	"os/signal"
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	gm "github.com/buger/goterm"
 	"github.com/moeart/ntr/pkg/asn"
 	"github.com/moeart/ntr/pkg/geoip"
 	"github.com/moeart/ntr/pkg/hop"
+	"golang.org/x/term"
 )
 
 // Tool name and copyright information, defined as global variables for access by other packages
@@ -266,6 +270,7 @@ func WatchWindowSize() {
 // ClearScreen clears the screen
 func ClearScreen() {
 	gm.Clear()
+	gm.Flush()
 }
 
 // MoveCursor moves the cursor to the specified position
@@ -276,4 +281,23 @@ func MoveCursor(x, y int) {
 // Flush flushes the output
 func Flush() {
 	gm.Flush()
+}
+
+// SetupInterruptHandler 设置中断处理器
+func SetupInterruptHandler(onInterrupt func()) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-c
+		onInterrupt()
+		os.Exit(0)
+	}()
+}
+
+// RestoreTerminal 恢复终端状态
+func RestoreTerminal() {
+	if oldState, err := term.GetState(int(os.Stdin.Fd())); err == nil {
+		term.Restore(int(os.Stdin.Fd()), oldState)
+	}
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/moeart/ntr/pkg/ntr"
 	"github.com/moeart/ntr/pkg/render"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 var (
@@ -136,6 +137,52 @@ var RootCmd = &cobra.Command{
 
 		mu := &sync.Mutex{}
 
+		// 设置优雅退出处理器
+		shutdownRequested := false
+		shutdownMutex := &sync.Mutex{}
+
+		cleanupFunc := func() {
+			shutdownMutex.Lock()
+			if shutdownRequested {
+				shutdownMutex.Unlock()
+				return
+			}
+			shutdownRequested = true
+			shutdownMutex.Unlock()
+
+			// 清除屏幕
+			render.ClearScreen()
+			// 恢复终端状态
+			render.RestoreTerminal()
+		}
+
+		// 设置中断信号处理器
+		render.SetupInterruptHandler(cleanupFunc)
+
+		// 设置终端原始模式以捕获按键
+		oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+		if err == nil {
+			defer term.Restore(int(os.Stdin.Fd()), oldState)
+
+			// 启动键盘监听
+			go func() {
+				buf := make([]byte, 1)
+				for {
+					n, err := os.Stdin.Read(buf)
+					if err != nil || n == 0 {
+						return
+					}
+
+					key := buf[0]
+					// 检查 q, Q, esc (27), ctrl+c (3)
+					if key == 'q' || key == 'Q' || key == 27 || key == 3 {
+						cleanupFunc()
+						os.Exit(0)
+					}
+				}
+			}()
+		}
+
 		// Start window size change monitoring
 		go render.WatchWindowSize()
 
@@ -159,13 +206,11 @@ var RootCmd = &cobra.Command{
 			}
 		}(ch)
 
+		// 运行 traceroute
 		m.Run(ch, COUNT)
-		close(ch)
-		mu.Lock()
-		render.MoveCursor(1, 1)
-		m.Render()
-		render.Flush()
-		mu.Unlock()
+
+		// 正常完成时的清理
+		cleanupFunc()
 		return nil
 	},
 }
