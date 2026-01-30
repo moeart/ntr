@@ -200,7 +200,7 @@ func rightPadString(s string, width int) string {
 	return strings.Repeat(" ", padding) + s
 }
 
-func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
+func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int, ttl int) {
 	if h == nil {
 		gm.Println("nil HopStatistic")
 		return
@@ -331,7 +331,7 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 
 	// Build row content
 	line := fmt.Sprintf("%3d  %s %s %s %s %s %s %s  %s %s",
-		h.TTL,
+		ttl,
 		dest,
 		loss,
 		sent,
@@ -347,8 +347,8 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int) {
 	if getStringDisplayWidth(line) > maxLength {
 		line = truncateString(line, maxLength)
 	}
-
-	gm.Printf("%s\n", line)
+	// BUGFIX: use fmt.Printf instead of gm.Printf due to gm.Printf will skip some lines
+	fmt.Printf("%s\n", line)
 }
 
 func (h *HopStatistic) lookupAddr(ptrLookup bool, index int) string {

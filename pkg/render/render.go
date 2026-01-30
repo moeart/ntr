@@ -139,7 +139,7 @@ func Render(m *NTRRenderConfig, offset int) {
 
 	// Print hop information
 	foundTarget := false
-	for i := 1; i <= len(m.Statistic); i++ {
+	for i := 1; i <= m.MaxHops; i++ {
 		hopStat := m.Statistic[i]
 		if hopStat != nil && !foundTarget {
 			// Check if current hop contains the target address
@@ -150,8 +150,7 @@ func Render(m *NTRRenderConfig, offset int) {
 				}
 			}
 
-			hopStat.Render(m.PtrLookup, width, destWidth)
-
+			hopStat.Render(m.PtrLookup, width, destWidth, i)
 			if foundTarget {
 				break
 			}
