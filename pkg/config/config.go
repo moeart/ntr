@@ -110,29 +110,29 @@ func LoadConfigFromDefaultPath() (*Config, error) {
 		// Get directory of executable
 		execDir = filepath.Dir(execPath)
 	}
-	
+
 	// Check current directory first
 	currentDir, _ := os.Getwd()
-	
+
 	// Build list of paths to check
 	paths := []string{}
-	
+
 	// First check paths relative to executable directory if available
 	if execDir != "" {
-		paths = append(paths, 
+		paths = append(paths,
 			filepath.Join(execDir, "config.yaml"),
 			filepath.Join(execDir, "conf", "config.yaml"),
 		)
 	}
-	
+
 	// Then check current directory
-	paths = append(paths, 
+	paths = append(paths,
 		filepath.Join(currentDir, "config.yaml"),
 		filepath.Join(currentDir, "conf", "config.yaml"),
 	)
-	
+
 	// Finally check system directory
-	paths = append(paths, 
+	paths = append(paths,
 		filepath.Join("/etc", "ntr", "config.yaml"),
 	)
 
