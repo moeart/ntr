@@ -1,4 +1,22 @@
-# What Changes
+## NTR Version: 5.2.2026.0130, build date: 2026-01-30
+### What Changes
+ 
+- fix(render): Fix title bar duplicate printing issue
+- feat(terminal): Add terminal state save/restore and interrupt handling functionality
+- refactor(render): Remove unused offset parameter and unify default value display
+- fix(render): Fix loop condition and output issue in hop count rendering
+- refactor(ntr): Remove platform-specific terminal size implementation
+- style(config): Format configuration file loading path code
+- fix(render): Use sync.Once to ensure screen clears only once to avoid flashing
+- refactor(render): Refactor rendering module to optimize terminal display
+ 
+### Known issues
+ 
+- CZ88 IP database has been stopped update service and ended at 2024-9-25
+- But has 3rd-party repository for IP database update
+ 
+## NTR Version: 5.0.2026.0116, build date: 2026-01-16
+### What Changes
  
 - **Complete rewrite from C# to Golang** for improved cross-platform compatibility
 - Added offline ASN database due to online service has been down
@@ -12,7 +30,7 @@
 - Optimized code structure and fixed potential memory leaks
 - Updated dependency versions to the latest
  
-# Known issues
+### Known issues
  
 - CZ88 IP database has been stopped update service and ended at 2024-9-25
 - But has 3rd-party repository for IP database update
