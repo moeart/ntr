@@ -5,6 +5,7 @@ import (
 	"net"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	gm "github.com/buger/goterm"
@@ -21,6 +22,9 @@ var (
 
 // Create window size change detection channel
 var resizeChan = make(chan bool, 1)
+
+// Once for clear screen operation
+var clearScreenOnce sync.Once
 
 // NTRRenderConfig contains configuration for rendering NTR data
 type NTRRenderConfig struct {
@@ -43,6 +47,9 @@ type NTRRenderConfig struct {
 
 // Render renders the NTR data to the terminal
 func Render(m *NTRRenderConfig, offset int) {
+	// Clear screen only once before first render
+	clearScreenOnce.Do(ClearScreen)
+
 	// Get terminal size
 	width, _ := GetTerminalSize()
 	maxLength := width - 3 // Prevent overflow
