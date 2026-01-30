@@ -140,6 +140,7 @@ func Render(m *NTRRenderConfig) {
 
 	// Title bar contrast highlight effect
 	gm.Println(gm.Background(gm.Color(title, gm.BLACK), gm.WHITE))
+	gm.Flush() //FIX: Flush to ensure title bar not double print
 
 	// Print hop information
 	foundTarget := false
