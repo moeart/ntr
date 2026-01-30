@@ -1,0 +1,660 @@
+看了C#版本的实现，我发现关键区别在于C#版本使用了更细粒度的光标控制，避免全屏重绘。让我为你修复闪屏问题：
+
+```go
+package ntr
+
+import (
+	"container/ring"
+	"fmt"
+	"math"
+	"math/rand"
+	"net"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
+
+	gm "github.com/buger/goterm"
+	"github.com/moeart/ntr/pkg/asn"
+	"github.com/moeart/ntr/pkg/geoip"
+	"github.com/moeart/ntr/pkg/hop"
+	"github.com/moeart/ntr/pkg/icmp"
+)
+
+// Tool name and copyright information, defined as global variables for access by other packages
+var (
+	ToolName      = "NTR - MoeArt's Network Traceroute"
+	ToolCopyright = "(c)2016-2026 MoeArt OpenSource, www.acgdraw.com"
+)
+
+type NTR struct {
+	SrcAddress     string `json:"source"`
+	mutex          *sync.RWMutex
+	timeout        time.Duration
+	interval       time.Duration
+	Address        string `json:"destination"`
+	hopsleep       time.Duration
+	Statistic      map[int]*hop.HopStatistic `json:"statistic"`
+	ringBufferSize int
+	maxHops        int
+	maxUnknownHops int
+	ptrLookup      bool
+	enableAsn      bool
+	asns           *asn.ASNs
+	enableGeoIP    bool
+	geoip          *geoip.GeoIP
+	lang           string
+	useQQWry       bool
+	// 新增字段：记录上次渲染的内容和行数
+	lastRenderedLines []string
+	currentLineCount  int
+}
+
+func NewNTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
+	hopsleep time.Duration, maxHops, maxUnknownHops, ringBufferSize int, ptr bool, enableAsn bool, enableGeoIP bool, lang string, useQQWry bool, forceIPv4 bool, forceIPv6 bool) (*NTR, chan struct{}, error) {
+	if net.ParseIP(addr) == nil {
+		// Domain resolution
+		if forceIPv4 {
+			// Force resolve IPv4 address
+			ipAddr, err := net.ResolveIPAddr("ip4", addr)
+			if err != nil {
+				return nil, nil, fmt.Errorf("no IPv4 address found for host: %s", err)
+			}
+			addr = ipAddr.IP.String()
+		} else if forceIPv6 {
+			// Force resolve IPv6 address
+			ipAddr, err := net.ResolveIPAddr("ip6", addr)
+			if err != nil {
+				return nil, nil, fmt.Errorf("no IPv6 address found for host: %s", err)
+			}
+			addr = ipAddr.IP.String()
+		} else {
+			// Default resolution behavior: IPv6 first (if available)
+			// First try to resolve IPv6 address
+			ipv6Addr, err := net.ResolveIPAddr("ip6", addr)
+			if err == nil {
+				addr = ipv6Addr.IP.String()
+			} else {
+				// IPv6 resolution failed, try to resolve IPv4 address
+				ipv4Addr, err := net.ResolveIPAddr("ip4", addr)
+				if err != nil {
+					return nil, nil, fmt.Errorf("no valid IP address found for host: %s", err)
+				}
+				addr = ipv4Addr.IP.String()
+			}
+		}
+	}
+	if srcAddr == "" {
+		if net.ParseIP(addr).To4() != nil {
+			srcAddr = "0.0.0.0"
+		} else {
+			srcAddr = "::"
+		}
+	}
+
+	ntr := &NTR{
+		SrcAddress:     srcAddr,
+		interval:       interval,
+		timeout:        timeout,
+		hopsleep:       hopsleep,
+		Address:        addr,
+		mutex:          &sync.RWMutex{},
+		Statistic:      map[int]*hop.HopStatistic{},
+		maxHops:        maxHops,
+		ringBufferSize: ringBufferSize,
+		maxUnknownHops: maxUnknownHops,
+		ptrLookup:      ptr,
+		enableAsn:      enableAsn,
+		enableGeoIP:    enableGeoIP,
+		lang:           lang,
+		useQQWry:       useQQWry,
+		lastRenderedLines: []string{},
+		currentLineCount: 0,
+	}
+
+	if enableAsn {
+		// Load ASN database
+		var err error
+		ntr.asns, err = asn.NewASNs()
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if enableGeoIP {
+		// Load GeoIP database
+		var err error
+		ntr.geoip, err = geoip.NewGeoIP()
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return ntr, make(chan struct{}, 1), nil
+}
+
+func (m *NTR) registerStatistic(ttl int, r icmp.ICMPReturn) *hop.HopStatistic {
+	s, ok := m.Statistic[ttl]
+	if !ok {
+		s = &hop.HopStatistic{
+			Sent:           0,
+			TTL:            ttl,
+			Timeout:        m.timeout,
+			Last:           r,
+			Worst:          r,
+			Lost:           0,
+			Packets:        ring.New(m.ringBufferSize),
+			RingBufferSize: m.ringBufferSize,
+			Targets:        []string{}, // Initialize Targets field to prevent nil pointer reference
+			Asns:           m.asns,     // Set ASNs field
+			GeoIP:          m.geoip,    // Set GeoIP field
+			Lang:           m.lang,
+			UseQQWry:       m.useQQWry,
+		}
+		m.Statistic[ttl] = s
+	}
+
+	s.Last = r
+	s.Sent++
+
+	s.Targets = addTarget(s.Targets, r.Addr)
+
+	s.Packets = s.Packets.Prev()
+	s.Packets.Value = r
+
+	if !r.Success {
+		s.Lost++
+		return s // do not count failed into statistics
+	}
+
+	s.SumElapsed = r.Elapsed + s.SumElapsed
+
+	if !s.Best.Success || s.Best.Elapsed > r.Elapsed {
+		s.Best = r
+	}
+	if s.Worst.Elapsed < r.Elapsed {
+		s.Worst = r
+	}
+
+	return s
+}
+
+func addTarget(currentTargets []string, toAdd string) []string {
+	for _, t := range currentTargets {
+		if t == toAdd {
+			// already added
+			return currentTargets
+		}
+	}
+
+	var newTargets []string
+	if len(currentTargets) > 0 {
+		// do not add no-ip target
+		if toAdd == "" {
+			return currentTargets
+		}
+
+		// remove no-ip target
+		for _, t := range currentTargets {
+			if t != "" {
+				newTargets = append(newTargets, t)
+			}
+		}
+	} else {
+		newTargets = currentTargets
+	}
+
+	// add the new one
+	return append(newTargets, toAdd)
+}
+
+// TODO: aggregates everything using the first target even when there are multiple
+
+// GetTerminalSize - Get terminal size, compatible with Windows, Linux and macOS
+func GetTerminalSize() (int, int) {
+	var width, height int
+
+	switch runtime.GOOS {
+	case "windows":
+		// Windows implementation
+		// Use the Windows-specific implementation from ntr_windows.go
+		width, height = getWindowsTerminalSize()
+	case "linux", "darwin":
+		// Linux and macOS implementation
+		// Use goterm's method for cross-platform compatibility
+		width = gm.Width() - 2
+		height = gm.Height()
+	default:
+		// Fallback for other platforms
+		width = gm.Width() - 2
+		height = gm.Height()
+	}
+
+	// Ensure width is at least 78 and height is at least 25
+	if width < 78 {
+		width = 78
+	}
+	if height < 25 {
+		height = 25
+	}
+
+	return width, height
+}
+
+// getStringDisplayWidth - Calculate string display width, Chinese characters count as 2, English characters count as 1
+func getStringDisplayWidth(s string) int {
+	width := 0
+	for _, r := range s {
+		if r >= 0x4e00 && r <= 0x9fff {
+			// Chinese characters occupy 2 widths
+			width += 2
+		} else {
+			// Other characters occupy 1 width
+			width += 1
+		}
+	}
+	return width
+}
+
+// padString - Pad string to specified width, supporting Chinese characters (left alignment)
+func padString(s string, width int) string {
+	currentWidth := getStringDisplayWidth(s)
+	if currentWidth >= width {
+		return s
+	}
+
+	padding := width - currentWidth
+	return s + strings.Repeat(" ", padding)
+}
+
+// rightPadString - Pad string to specified width, supporting Chinese characters (right alignment)
+func rightPadString(s string, width int) string {
+	currentWidth := getStringDisplayWidth(s)
+	if currentWidth >= width {
+		return s
+	}
+
+	padding := width - currentWidth
+	return strings.Repeat(" ", padding) + s
+}
+
+// 移动光标到指定位置
+func moveCursor(row, col int) {
+	fmt.Printf("\033[%d;%dH", row+1, col+1)
+}
+
+// 清除从当前光标位置到屏幕末尾
+func clearToEndOfScreen() {
+	fmt.Print("\033[J")
+}
+
+// 清除从当前光标位置到行末
+func clearToEndOfLine() {
+	fmt.Print("\033[K")
+}
+
+// 保存光标位置
+func saveCursorPosition() {
+	fmt.Print("\0337")
+}
+
+// 恢复光标位置
+func restoreCursorPosition() {
+	fmt.Print("\0338")
+}
+
+// Function to detect window size changes
+func monitorWindowResize(resizeChan chan bool) {
+	prevWidth, _ := GetTerminalSize()
+	for {
+		time.Sleep(200 * time.Millisecond) // Check every 200ms
+		currWidth, _ := GetTerminalSize()
+		if currWidth != prevWidth {
+			resizeChan <- true
+			prevWidth = currWidth
+		}
+	}
+}
+
+func (m *NTR) Render(offset int) {
+	// 保存当前渲染的行数
+	oldLineCount := m.currentLineCount
+	
+	// 构建当前帧的内容
+	var currentLines []string
+	
+	// Get terminal size
+	width, _ := GetTerminalSize()
+	maxLength := width - 3 // Prevent overflow
+
+	// Build header lines
+	var headerLines []string
+	
+	// Print tool information
+	// Print tool name and copyright information centered
+	padding := (maxLength - len(ToolName)) / 2
+	if padding > 0 {
+		headerLines = append(headerLines, fmt.Sprintf("%*s%s%*s", padding, "", ToolName, padding, ""))
+	} else {
+		headerLines = append(headerLines, ToolName[:maxLength])
+	}
+
+	padding = (maxLength - len(ToolCopyright)) / 2
+	if padding > 0 {
+		headerLines = append(headerLines, fmt.Sprintf("%*s%s%*s", padding, "", ToolCopyright, padding, ""))
+	} else {
+		headerLines = append(headerLines, ToolCopyright[:maxLength])
+	}
+
+	// Print information line
+	infoLeft := fmt.Sprintf("DEST: %s", m.Address)
+	startTime := time.Now().Format("2006-01-02 15:04:05")
+	infoRight := fmt.Sprintf("START: %s", startTime)
+	paddingRight := maxLength - len(infoLeft) - len(infoRight)
+	if paddingRight > 0 {
+		headerLines = append(headerLines, fmt.Sprintf("%s%s%s", infoLeft, strings.Repeat(" ", paddingRight), infoRight))
+	} else {
+		headerLines = append(headerLines, infoLeft[:maxLength])
+	}
+	
+	// Add empty line
+	headerLines = append(headerLines, "")
+
+	// Determine column format, adjust DESTINATION column width based on IPv4/IPv6
+	isIPv6 := net.ParseIP(m.Address).To4() == nil
+	var destWidth int
+	if isIPv6 {
+		destWidth = 40
+	} else {
+		destWidth = 17
+	}
+
+	// Calculate other column widths
+	lossWidth := 5
+	sentWidth := 5
+	lastWidth := 5
+	bestWidth := 5
+	avgWidth := 5
+	wrstWidth := 5
+	asnWidth := 7
+	locationWidth := maxLength - 3 - 2 - destWidth - 2 - lossWidth - sentWidth - lastWidth - bestWidth - avgWidth - wrstWidth - 2 - asnWidth - 1
+
+	// Build format string
+	format := "%3s  %s %s %s %s %s %s %s  %s %s"
+
+	// Build title bar
+	var title string
+	if m.lang == "zh" {
+		title = fmt.Sprintf(format,
+			"#",
+			padString("目标主机", destWidth),
+			rightPadString("丢包%", lossWidth),
+			rightPadString("发送", sentWidth),
+			rightPadString("最近", lastWidth),
+			rightPadString("最快", bestWidth),
+			rightPadString("平均", avgWidth),
+			rightPadString("最慢", wrstWidth),
+			padString("ASN", asnWidth),
+			padString("IP位置信息", locationWidth),
+		)
+	} else {
+		title = fmt.Sprintf(format,
+			"#",
+			padString("DESTINATION", destWidth),
+			rightPadString("LOSS%", lossWidth),
+			rightPadString("SENT", sentWidth),
+			rightPadString("LAST", lastWidth),
+			rightPadString("BEST", bestWidth),
+			rightPadString("AVG", avgWidth),
+			rightPadString("WRST", wrstWidth),
+			padString("ASN", asnWidth),
+			padString("LOCATION", locationWidth),
+		)
+	}
+
+	// Title bar with background color
+	headerLines = append(headerLines, gm.Background(gm.Color(title, gm.BLACK), gm.WHITE))
+	
+	// Add header lines to current lines
+	currentLines = append(currentLines, headerLines...)
+
+	// Build hop information lines
+	foundTarget := false
+	m.mutex.RLock()
+	hopCount := len(m.Statistic)
+	for i := 1; i <= hopCount; i++ {
+		hopStat := m.Statistic[i]
+		if hopStat != nil && !foundTarget {
+			// Check if current hop contains the target address
+			for _, target := range hopStat.Targets {
+				if target == m.Address {
+					foundTarget = true
+					break
+				}
+			}
+
+			// 获取渲染的字符串
+			hopLine := hopStat.RenderLine(m.ptrLookup, width, destWidth, locationWidth, asnWidth)
+			if hopLine != "" {
+				currentLines = append(currentLines, hopLine)
+			}
+
+			if foundTarget {
+				break
+			}
+		}
+	}
+	m.mutex.RUnlock()
+	
+	// 保存新的行数和内容
+	m.currentLineCount = len(currentLines)
+	
+	// 使用差异渲染：只更新变化的部分
+	// 将光标移动到起始位置
+	moveCursor(0, 0)
+	
+	// 逐行比较并输出
+	for i := 0; i < m.currentLineCount; i++ {
+		if i < len(m.lastRenderedLines) {
+			// 行已存在，比较内容
+			if i < len(currentLines) && currentLines[i] != m.lastRenderedLines[i] {
+				// 内容不同，更新该行
+				moveCursor(i, 0)
+				clearToEndOfLine()
+				fmt.Print(currentLines[i])
+			}
+		} else {
+			// 新行，直接输出
+			moveCursor(i, 0)
+			fmt.Print(currentLines[i])
+		}
+	}
+	
+	// 如果新内容比旧内容少，清除多余的行
+	if oldLineCount > m.currentLineCount {
+		for i := m.currentLineCount; i < oldLineCount; i++ {
+			moveCursor(i, 0)
+			clearToEndOfLine()
+		}
+	}
+	
+	// 保存当前渲染的内容
+	m.lastRenderedLines = currentLines
+	
+	// 将光标移动到最后一行之后，避免干扰显示
+	moveCursor(m.currentLineCount, 0)
+}
+
+func (m *NTR) Run(ch chan struct{}, count int) {
+	// Ignore count parameter, let the program run continuously until Ctrl+C is pressed
+	m.discover(ch)
+}
+
+// discover discovers all hops on the route
+func (m *NTR) discover(ch chan struct{}) {
+	// Sequences are incrementing as we don't won't to get old replys which might be from a previous run (where we timed out and continued).
+	// We can't use the process id as unique identifier as there might be multiple runs within a single binary, thus we use a fixed pseudo random number.
+	rand.Seed(time.Now().UnixNano())
+	seq := rand.Intn(math.MaxUint16)
+	id := rand.Intn(math.MaxUint16) & 0xffff
+
+	ipAddr := net.IPAddr{IP: net.ParseIP(m.Address)}
+
+	for {
+		time.Sleep(m.interval)
+		var wg sync.WaitGroup
+		for ttl := 1; ttl <= m.maxHops; ttl++ {
+			wg.Add(1)
+			go func(ttlVal int, seqVal int) {
+				defer wg.Done()
+				var hopReturn icmp.ICMPReturn
+				if ipAddr.IP.To4() != nil {
+					hopReturn, _ = icmp.SendDiscoverICMP(m.SrcAddress, &ipAddr, ttlVal, id, m.timeout, seqVal)
+				} else {
+					hopReturn, _ = icmp.SendDiscoverICMPv6(m.SrcAddress, &ipAddr, ttlVal, id, m.timeout, seqVal)
+				}
+				m.mutex.Lock()
+				s := m.registerStatistic(ttlVal, hopReturn)
+				s.Dest = &ipAddr
+				s.PID = id
+				m.mutex.Unlock()
+				ch <- struct{}{}
+			}(ttl, seq+ttl)
+		}
+		seq += m.maxHops
+		wg.Wait()
+	}
+}
+```
+
+另外，你需要在 `hop` 包中添加 `RenderLine` 方法。让我为 `hop` 包添加这个方法：
+
+```go
+// 在 hop/hop.go 中添加 RenderLine 方法
+func (h *HopStatistic) RenderLine(ptrLookup bool, width, destWidth, locationWidth, asnWidth int) string {
+	if h == nil || len(h.Targets) == 0 {
+		return ""
+	}
+
+	// 计算列宽
+	lossWidth := 5
+	sentWidth := 5
+	lastWidth := 5
+	bestWidth := 5
+	avgWidth := 5
+	wrstWidth := 5
+	
+	// Build format string
+	format := "%3s  %s %s %s %s %s %s %s  %s %s"
+	
+	// 获取目标地址
+	var targetStr string
+	if len(h.Targets) > 0 && h.Targets[0] != "" {
+		targetStr = h.Targets[0]
+		if ptrLookup {
+			// 尝试解析主机名
+			if names, err := net.LookupAddr(targetStr); err == nil && len(names) > 0 {
+				targetStr = names[0]
+				// 去掉末尾的点
+				if strings.HasSuffix(targetStr, ".") {
+					targetStr = targetStr[:len(targetStr)-1]
+				}
+				// 如果主机名太长，截断
+				if len(targetStr) > destWidth {
+					targetStr = targetStr[:destWidth-3] + "..."
+				}
+			}
+		}
+	} else {
+		targetStr = "*"
+	}
+	
+	// 计算统计数据
+	lossPercent := 0.0
+	if h.Sent > 0 {
+		lossPercent = (float64(h.Lost) / float64(h.Sent)) * 100.0
+	}
+	
+	avg := 0.0
+	successCount := h.Sent - h.Lost
+	if successCount > 0 {
+		avg = float64(h.SumElapsed) / float64(successCount)
+	}
+	
+	// 格式化数据
+	lossStr := fmt.Sprintf("%5.1f", lossPercent)
+	sentStr := fmt.Sprintf("%5d", h.Sent)
+	
+	lastStr := fmt.Sprintf("%5s", "--")
+	if h.Last.Success {
+		lastStr = fmt.Sprintf("%5d", h.Last.Elapsed/time.Millisecond)
+	}
+	
+	bestStr := fmt.Sprintf("%5s", "--")
+	if h.Best.Success {
+		bestStr = fmt.Sprintf("%5d", h.Best.Elapsed/time.Millisecond)
+	}
+	
+	avgStr := fmt.Sprintf("%5s", "--")
+	if successCount > 0 {
+		avgStr = fmt.Sprintf("%5.0f", avg/float64(time.Millisecond))
+	}
+	
+	wrstStr := fmt.Sprintf("%5s", "--")
+	if h.Worst.Success {
+		wrstStr = fmt.Sprintf("%5d", h.Worst.Elapsed/time.Millisecond)
+	}
+	
+	// ASN信息
+	asnInfo := ""
+	if h.Asns != nil && len(h.Targets) > 0 && h.Targets[0] != "" {
+		if asn := h.Asns.Lookup(h.Targets[0]); asn != "" {
+			asnInfo = asn
+		}
+	}
+	if len(asnInfo) > asnWidth {
+		asnInfo = asnInfo[:asnWidth-3] + "..."
+	}
+	
+	// 地理位置信息
+	location := ""
+	if h.GeoIP != nil && len(h.Targets) > 0 && h.Targets[0] != "" {
+		if loc := h.GeoIP.Lookup(h.Targets[0], h.Lang, h.UseQQWry); loc != "" {
+			location = loc
+		}
+	}
+	if len(location) > locationWidth {
+		location = location[:locationWidth-3] + "..."
+	}
+	
+	// 对齐文本
+	targetStr = padString(targetStr, destWidth)
+	asnInfo = padString(asnInfo, asnWidth)
+	location = padString(location, locationWidth)
+	
+	// 构建行
+	line := fmt.Sprintf(format,
+		fmt.Sprintf("%d", h.TTL),
+		targetStr,
+		lossStr,
+		sentStr,
+		lastStr,
+		bestStr,
+		avgStr,
+		wrstStr,
+		asnInfo,
+		location,
+	)
+	
+	return line
+}
+```
+
+主要改进：
+
+1. **差异渲染**：只更新实际发生变化的行，而不是重绘整个屏幕
+2. **光标控制**：使用ANSI转义序列精确控制光标位置
+3. **行缓冲**：记录上次渲染的内容，与新内容比较
+4. **避免清屏**：不再使用 `gm.Clear()` 或 `gm.Flush()` 清屏
+
+这样修改后，程序只会更新实际发生变化的部分，大大减少了闪屏现象。这与C#版本使用的技术类似：通过比较前后帧的差异，只更新需要更新的部分。

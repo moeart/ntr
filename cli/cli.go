@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	tm "github.com/buger/goterm"
 	"github.com/moeart/ntr/pkg/asn"
 	"github.com/moeart/ntr/pkg/config"
 	"github.com/moeart/ntr/pkg/geoip"
 	"github.com/moeart/ntr/pkg/ntr"
+	"github.com/moeart/ntr/pkg/render"
 	"github.com/spf13/cobra"
 )
 
@@ -134,11 +134,10 @@ var RootCmd = &cobra.Command{
 			return err
 		}
 
-		tm.Clear()
 		mu := &sync.Mutex{}
 
 		// Start window size change monitoring
-		go watchWindowSize()
+		go render.WatchWindowSize()
 
 		// Handle network updates and window size changes
 		go func(ch chan struct{}) {
@@ -146,11 +145,15 @@ var RootCmd = &cobra.Command{
 				select {
 				case <-ch:
 					mu.Lock()
-					render(m)
+					render.MoveCursor(1, 1)
+					m.Render(1)
+					render.Flush()
 					mu.Unlock()
-				case <-resizeChan:
+				case <-render.GetResizeChan():
 					mu.Lock()
-					render(m)
+					render.MoveCursor(1, 1)
+					m.Render(1)
+					render.Flush()
 					mu.Unlock()
 				}
 			}
@@ -159,34 +162,12 @@ var RootCmd = &cobra.Command{
 		m.Run(ch, COUNT)
 		close(ch)
 		mu.Lock()
-		render(m)
+		render.MoveCursor(1, 1)
+		m.Render(1)
+		render.Flush()
 		mu.Unlock()
 		return nil
 	},
-}
-
-// Create window size change detection channel
-var resizeChan = make(chan bool, 1)
-
-func render(m *ntr.NTR) {
-	tm.Clear()
-	tm.MoveCursor(1, 1)
-	m.Render(1)
-	tm.Flush() // Call it every time at the end of rendering
-}
-
-// Function to monitor window size changes
-func watchWindowSize() {
-	// Use polling to detect window size changes
-	prevWidth, _ := ntr.GetTerminalSize()
-	for {
-		time.Sleep(200 * time.Millisecond) // Check every 200ms
-		currWidth, _ := ntr.GetTerminalSize()
-		if currWidth != prevWidth {
-			resizeChan <- true
-			prevWidth = currWidth
-		}
-	}
 }
 
 func init() {
