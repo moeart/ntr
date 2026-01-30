@@ -19,7 +19,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.25'
+        go-version: '1.23'
 
     - name: Build
       run: go build -v ./...
@@ -52,7 +52,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.25'
+        go-version: '1.23'
 
     - name: Determine file extension
       id: ext
@@ -65,7 +65,7 @@ jobs:
 
     - name: Build cross-platform
       run: |
-        VERSION="5.2.2026.0130"
+        VERSION="5.3.2026.0130"
         BUILD_DATE=$(date +"%Y-%m-%d")
         OUTPUT_NAME="ntr-${{ matrix.goos }}-${{ matrix.goarch }}${{ steps.ext.outputs.extension }}"
         go build -o "dist/$OUTPUT_NAME" -ldflags "-X 'github.com/moeart/ntr/cli.version=$VERSION' -X 'github.com/moeart/ntr/cli.date=$BUILD_DATE'" .

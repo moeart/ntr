@@ -40,6 +40,7 @@ type NTR struct {
 	geoip          *geoip.GeoIP
 	lang           string
 	useQQWry       bool
+	startTime      string
 }
 
 func NewNTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
@@ -100,6 +101,7 @@ func NewNTR(addr, srcAddr string, timeout time.Duration, interval time.Duration,
 		enableGeoIP:    enableGeoIP,
 		lang:           lang,
 		useQQWry:       useQQWry,
+		startTime:      time.Now().Format("2006-01-02 15:04:05"),
 	}
 
 	if enableAsn {
@@ -205,6 +207,7 @@ func (m *NTR) Render() {
 	renderConfig := &render.NTRRenderConfig{
 		SrcAddress:     m.SrcAddress,
 		Address:        m.Address,
+		StartTime:      m.startTime,
 		Statistic:      m.Statistic,
 		Timeout:        m.timeout,
 		Interval:       m.interval,

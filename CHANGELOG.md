@@ -1,4 +1,4 @@
-## NTR Version: 5.2.2026.0130, build date: 2026-01-30
+## NTR Version: 5.3.2026.0130, build date: 2026-01-30
 ### What Changes
  
 - fix(render): Fix title bar duplicate printing issue

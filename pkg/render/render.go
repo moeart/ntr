@@ -34,6 +34,7 @@ var clearScreenOnce sync.Once
 type NTRRenderConfig struct {
 	SrcAddress     string
 	Address        string
+	StartTime      string
 	Statistic      map[int]*hop.HopStatistic
 	Timeout        time.Duration
 	Interval       time.Duration
@@ -77,8 +78,7 @@ func Render(m *NTRRenderConfig) {
 
 	// Print information line
 	infoLeft := fmt.Sprintf("DEST: %s", m.Address)
-	startTime := time.Now().Format("2006-01-02 15:04:05")
-	infoRight := fmt.Sprintf("START: %s", startTime)
+	infoRight := fmt.Sprintf("START: %s", m.StartTime)
 	paddingRight := maxLength - len(infoLeft) - len(infoRight)
 	if paddingRight > 0 {
 		gm.Printf("%s%s%s\n", infoLeft, strings.Repeat(" ", paddingRight), infoRight)
