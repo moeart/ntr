@@ -200,7 +200,7 @@ func addTarget(currentTargets []string, toAdd string) []string {
 
 // TODO: aggregates everything using the first target even when there are multiple
 
-func (m *NTR) Render(offset int) {
+func (m *NTR) Render() {
 	// Create render config
 	renderConfig := &render.NTRRenderConfig{
 		SrcAddress:     m.SrcAddress,
@@ -221,7 +221,7 @@ func (m *NTR) Render(offset int) {
 	}
 
 	// Render using the render package
-	render.RenderNTR(renderConfig, offset)
+	render.RenderNTR(renderConfig)
 }
 
 func (m *NTR) Run(ch chan struct{}, count int) {

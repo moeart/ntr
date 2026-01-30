@@ -195,7 +195,7 @@ func (g *GeoIP) LookupByIP(ipStr string, lang string, useQQWry bool, asns *asn.A
 		}
 	}
 
-	return &Location{Country: "N/A"}, nil
+	return &Location{Country: "- -"}, nil
 }
 
 // Location - Represents geographical location information
@@ -225,7 +225,7 @@ func (l *Location) Format(lang string) string {
 
 	// If data is from ASN (usually 2-letter country code, Province/City empty)
 	if l.Country != "" && l.Province == "" && l.City == "" && l.District == "" {
-		if l.Country != "N/A" {
+		if l.Country != "- -" {
 			parts = append(parts, l.Country)
 		}
 		if l.ISP != "" {
@@ -263,9 +263,9 @@ func (l *Location) Format(lang string) string {
 		}
 	}
 
-	// If no information available, return N/A
+	// If no information available, return "- -"
 	if len(parts) == 0 {
-		return "N/A"
+		return "- -"
 	}
 
 	return strings.Join(parts, " ")
@@ -334,10 +334,10 @@ func GetBinaryDatabasePath() string {
 		currentDir, _ := os.Getwd()
 		return filepath.Join(currentDir, BinaryDatabaseFile)
 	}
-	
+
 	// Get directory of executable
 	execDir := filepath.Dir(execPath)
-	
+
 	// Check paths relative to executable directory first
 	paths := []string{
 		filepath.Join(execDir, BinaryDatabaseFile),

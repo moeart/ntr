@@ -46,7 +46,7 @@ type NTRRenderConfig struct {
 }
 
 // Render renders the NTR data to the terminal
-func Render(m *NTRRenderConfig, offset int) {
+func Render(m *NTRRenderConfig) {
 	// Clear screen only once before first render
 	clearScreenOnce.Do(ClearScreen)
 
@@ -240,8 +240,8 @@ func monitorWindowResize(resizeChan chan bool) {
 }
 
 // RenderNTR renders the NTR data to the terminal
-func RenderNTR(m *NTRRenderConfig, offset int) {
-	Render(m, offset)
+func RenderNTR(m *NTRRenderConfig) {
+	Render(m)
 }
 
 // GetResizeChan returns the resize channel

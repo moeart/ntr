@@ -146,13 +146,13 @@ var RootCmd = &cobra.Command{
 				case <-ch:
 					mu.Lock()
 					render.MoveCursor(1, 1)
-					m.Render(1)
+					m.Render()
 					render.Flush()
 					mu.Unlock()
 				case <-render.GetResizeChan():
 					mu.Lock()
 					render.MoveCursor(1, 1)
-					m.Render(1)
+					m.Render()
 					render.Flush()
 					mu.Unlock()
 				}
@@ -163,7 +163,7 @@ var RootCmd = &cobra.Command{
 		close(ch)
 		mu.Lock()
 		render.MoveCursor(1, 1)
-		m.Render(1)
+		m.Render()
 		render.Flush()
 		mu.Unlock()
 		return nil
