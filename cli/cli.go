@@ -140,6 +140,7 @@ var RootCmd = &cobra.Command{
 		// 设置优雅退出处理器
 		shutdownRequested := false
 		shutdownMutex := &sync.Mutex{}
+		var terminalState *term.State
 
 		cleanupFunc := func() {
 			shutdownMutex.Lock()
@@ -153,17 +154,17 @@ var RootCmd = &cobra.Command{
 			// 清除屏幕
 			render.ClearScreen()
 			// 恢复终端状态
-			render.RestoreTerminal()
+			if terminalState != nil {
+				term.Restore(int(os.Stdin.Fd()), terminalState)
+			}
 		}
 
 		// 设置中断信号处理器
 		render.SetupInterruptHandler(cleanupFunc)
 
 		// 设置终端原始模式以捕获按键
-		oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+		terminalState, err = term.MakeRaw(int(os.Stdin.Fd()))
 		if err == nil {
-			defer term.Restore(int(os.Stdin.Fd()), oldState)
-
 			// 启动键盘监听
 			go func() {
 				buf := make([]byte, 1)

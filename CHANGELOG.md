@@ -1,6 +1,7 @@
-## NTR Version: 5.3.2026.0130, build date: 2026-01-30
+## NTR Version: 5.3.2026.0212, build date: 2026-01-30
 ### What Changes
  
+- fix(cli): Fix terminal state restore issue after interrupt
 - fix(render): Fix title bar duplicate printing issue
 - feat(terminal): Add terminal state save/restore and interrupt handling functionality
 - refactor(render): Remove unused offset parameter and unify default value display
