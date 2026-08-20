@@ -1,3 +1,10 @@
+## NTR Version: 6.0.2026.0820, build date: 2026-08-20
+### What Changes
+
+- Major release: modernized tview/tcell TUI with the original NTR table style.
+- Fixed TTL pacing, ICMP error handling, terminal flicker, keyboard deadlocks, and resize stability.
+- Added Chinese/English UI, ASN/GeoIP/PTR caching, adaptive routing table, and Windows amd64/386/arm64 builds.
+
 ## NTR Version: 5.3.2026.0212, build date: 2026-01-30
 ### What Changes
  

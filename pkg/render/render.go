@@ -52,50 +52,47 @@ type NTRRenderConfig struct {
 
 // Render renders the NTR data to the terminal
 func Render(m *NTRRenderConfig) {
-	// Clear screen only once before first render
+	// Clear once, then repaint from the top. The frame itself is submitted in
+	// one write below; mixing goterm's Screen buffer with fmt.Printf caused
+	// visible tearing and partial frames.
 	clearScreenOnce.Do(ClearScreen)
 
-	// Get terminal size
 	width, _ := GetTerminalSize()
-	maxLength := width - 3 // Prevent overflow
+	maxLength := width - 3
+	var frame strings.Builder
 
-	// Print tool information
-
-	// Print tool name and copyright information centered
-	padding := (maxLength - len(ToolName)) / 2
+	padding := (maxLength - getStringDisplayWidth(ToolName)) / 2
 	if padding > 0 {
-		gm.Printf("%*s%s%*s\n", padding, "", ToolName, padding, "")
+		fmt.Fprintf(&frame, "%*s%s%*s\n", padding, "", ToolName, padding, "")
 	} else {
-		gm.Printf("%s\n", ToolName[:maxLength])
+		frame.WriteString(truncateString(ToolName, maxLength))
+		frame.WriteByte('\n')
 	}
 
-	padding = (maxLength - len(ToolCopyright)) / 2
+	padding = (maxLength - getStringDisplayWidth(ToolCopyright)) / 2
 	if padding > 0 {
-		gm.Printf("%*s%s%*s\n", padding, "", ToolCopyright, padding, "")
+		fmt.Fprintf(&frame, "%*s%s%*s\n", padding, "", ToolCopyright, padding, "")
 	} else {
-		gm.Printf("%s\n", ToolCopyright[:maxLength])
+		frame.WriteString(truncateString(ToolCopyright, maxLength))
+		frame.WriteByte('\n')
 	}
 
-	// Print information line
 	infoLeft := fmt.Sprintf("DEST: %s", m.Address)
 	infoRight := fmt.Sprintf("START: %s", m.StartTime)
-	paddingRight := maxLength - len(infoLeft) - len(infoRight)
+	paddingRight := maxLength - getStringDisplayWidth(infoLeft) - getStringDisplayWidth(infoRight)
 	if paddingRight > 0 {
-		gm.Printf("%s%s%s\n", infoLeft, strings.Repeat(" ", paddingRight), infoRight)
+		fmt.Fprintf(&frame, "%s%s%s\n", infoLeft, strings.Repeat(" ", paddingRight), infoRight)
 	} else {
-		gm.Printf("%s\n", infoLeft[:maxLength])
+		frame.WriteString(truncateString(infoLeft, maxLength))
+		frame.WriteByte('\n')
 	}
 
-	// Determine column format, adjust DESTINATION column width based on IPv4/IPv6
 	isIPv6 := net.ParseIP(m.Address).To4() == nil
-	var destWidth int
+	destWidth := 17
 	if isIPv6 {
 		destWidth = 40
-	} else {
-		destWidth = 17
 	}
 
-	// Calculate other column widths
 	lossWidth := 5
 	sentWidth := 5
 	lastWidth := 5
@@ -104,63 +101,45 @@ func Render(m *NTRRenderConfig) {
 	wrstWidth := 5
 	asnWidth := 7
 	locationWidth := maxLength - 3 - 2 - destWidth - 2 - lossWidth - sentWidth - lastWidth - bestWidth - avgWidth - wrstWidth - 2 - asnWidth - 1
-
-	// Build format string
-	format := "%3s  %s %s %s %s %s %s %s  %s %s"
-
-	// Print title bar
-	var title string
-	if m.Lang == "zh" {
-		title = fmt.Sprintf(format,
-			"#",
-			padString("目标主机", destWidth),
-			rightPadString("丢包%", lossWidth),
-			rightPadString("发送", sentWidth),
-			rightPadString("最近", lastWidth),
-			rightPadString("最快", bestWidth),
-			rightPadString("平均", avgWidth),
-			rightPadString("最慢", wrstWidth),
-			padString("ASN", asnWidth),
-			padString("IP位置信息", locationWidth),
-		)
-	} else {
-		title = fmt.Sprintf(format,
-			"#",
-			padString("DESTINATION", destWidth),
-			rightPadString("LOSS%", lossWidth),
-			rightPadString("SENT", sentWidth),
-			rightPadString("LAST", lastWidth),
-			rightPadString("BEST", bestWidth),
-			rightPadString("AVG", avgWidth),
-			rightPadString("WRST", wrstWidth),
-			padString("ASN", asnWidth),
-			padString("LOCATION", locationWidth),
-		)
+	if locationWidth < 1 {
+		locationWidth = 1
 	}
 
-	// Title bar contrast highlight effect
-	gm.Println(gm.Background(gm.Color(title, gm.BLACK), gm.WHITE))
-	gm.Flush() //FIX: Flush to ensure title bar not double print
+	format := "%3s  %s %s %s %s %s %s %s  %s %s"
+	var title string
+	if m.Lang == "zh" {
+		title = fmt.Sprintf(format, "#", padString("目标主机", destWidth), rightPadString("丢包%", lossWidth), rightPadString("发送", sentWidth), rightPadString("最近", lastWidth), rightPadString("最快", bestWidth), rightPadString("平均", avgWidth), rightPadString("最慢", wrstWidth), padString("ASN", asnWidth), padString("IP位置信息", locationWidth))
+	} else {
+		title = fmt.Sprintf(format, "#", padString("DESTINATION", destWidth), rightPadString("LOSS%", lossWidth), rightPadString("SENT", sentWidth), rightPadString("LAST", lastWidth), rightPadString("BEST", bestWidth), rightPadString("AVG", avgWidth), rightPadString("WRST", wrstWidth), padString("ASN", asnWidth), padString("LOCATION", locationWidth))
+	}
+	frame.WriteString(gm.Background(title, gm.BLACK))
+	frame.WriteByte('\n')
 
-	// Print hop information
 	foundTarget := false
 	for i := 1; i <= m.MaxHops; i++ {
 		hopStat := m.Statistic[i]
-		if hopStat != nil && !foundTarget {
-			// Check if current hop contains the target address
-			for _, target := range hopStat.Targets {
-				if target == m.Address {
-					foundTarget = true
-					break
-				}
-			}
-
-			hopStat.Render(m.PtrLookup, width, destWidth, i)
-			if foundTarget {
+		if hopStat == nil || foundTarget {
+			continue
+		}
+		for _, target := range hopStat.Targets {
+			if target == m.Address {
+				foundTarget = true
 				break
 			}
 		}
+		if line := hopStat.Render(m.PtrLookup, width, destWidth, i); line != "" {
+			frame.WriteString(line)
+			frame.WriteByte('\n')
+		}
 	}
+
+	// Home first, then erase anything left by a taller previous frame. This
+	// avoids a full-screen clear on every update while still preventing stale
+	// rows after a resize or route convergence.
+	gm.Output.WriteString("\033[H")
+	gm.Output.WriteString(frame.String())
+	gm.Output.WriteString("\033[J")
+	gm.Output.Flush()
 }
 
 // GetTerminalSize - Get terminal size, compatible with Windows, Linux and macOS
@@ -210,6 +189,30 @@ func getStringDisplayWidth(s string) int {
 }
 
 // padString - Pad string to specified width, supporting Chinese characters (left alignment)
+func truncateString(s string, maxWidth int) string {
+	if maxWidth <= 0 {
+		return ""
+	}
+	if getStringDisplayWidth(s) <= maxWidth {
+		return s
+	}
+
+	var b strings.Builder
+	currentWidth := 0
+	for _, r := range s {
+		runeWidth := 1
+		if r >= 0x4e00 && r <= 0x9fff {
+			runeWidth = 2
+		}
+		if currentWidth+runeWidth > maxWidth {
+			break
+		}
+		b.WriteRune(r)
+		currentWidth += runeWidth
+	}
+	return b.String()
+}
+
 func padString(s string, width int) string {
 	currentWidth := getStringDisplayWidth(s)
 	if currentWidth >= width {

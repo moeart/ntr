@@ -28,7 +28,7 @@ network:
   # Timeout for router responses
   timeout: 1000ms
   # Interval between traceroute runs
-  interval: 200ms
+  interval: 1s
   # Sleep time between hops
   hop_sleep: 0ms
 

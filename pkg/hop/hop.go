@@ -7,9 +7,9 @@ import (
 	"math"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
-	gm "github.com/buger/goterm"
 	"github.com/moeart/ntr/pkg/asn"
 	"github.com/moeart/ntr/pkg/geoip"
 	"github.com/moeart/ntr/pkg/icmp"
@@ -31,7 +31,10 @@ type HopStatistic struct {
 	Lost           int
 	Packets        *ring.Ring
 	RingBufferSize int
+	mu             sync.RWMutex
 	dnsCache       map[string]string
+	cacheMu        sync.Mutex
+	lookupCache    map[string]lookupMetadata
 	Asns           *asn.ASNs
 	GeoIP          *geoip.GeoIP
 	Lang           string
@@ -43,6 +46,160 @@ type HopStatistic struct {
 type packet struct {
 	Success      bool    `json:"success"`
 	ResponseTime float64 `json:"respond_ms"`
+}
+
+type lookupMetadata struct {
+	asn      string
+	location string
+}
+
+// Snapshot is an immutable view of one hop for terminal UIs and exporters.
+// Record adds one probe result while holding the hop-local lock.
+func (h *HopStatistic) Record(r icmp.ICMPReturn) {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.Last = r
+	h.Sent++
+	h.Targets = appendTarget(h.Targets, r.Addr)
+	if h.Packets != nil {
+		h.Packets = h.Packets.Prev()
+		h.Packets.Value = r
+	}
+	if !r.Success {
+		h.Lost++
+		return
+	}
+	h.SumElapsed += r.Elapsed
+	if !h.Best.Success || h.Best.Elapsed > r.Elapsed {
+		h.Best = r
+	}
+	if h.Worst.Elapsed < r.Elapsed {
+		h.Worst = r
+	}
+}
+
+// SetRouteInfo updates the destination metadata associated with a hop.
+func (h *HopStatistic) SetRouteInfo(dest *net.IPAddr, pid int) {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	h.Dest = dest
+	h.PID = pid
+	h.mu.Unlock()
+}
+
+func appendTarget(targets []string, address string) []string {
+	if address == "" {
+		return targets
+	}
+	for _, target := range targets {
+		if target == address {
+			return targets
+		}
+	}
+	if len(targets) > 0 {
+		filtered := targets[:0]
+		for _, target := range targets {
+			if target != "" {
+				filtered = append(filtered, target)
+			}
+		}
+		targets = filtered
+	}
+	return append(targets, address)
+}
+
+type Snapshot struct {
+	TTL       int
+	Address   string
+	Target    string
+	Sent      int
+	Lost      int
+	Loss      float64
+	LastMS    float64
+	BestMS    float64
+	AverageMS float64
+	WorstMS   float64
+	ASN       string
+	Location  string
+}
+
+// Snapshot returns display-ready values without exposing mutable ring-buffer state.
+func (h *HopStatistic) Snapshot(ptrLookup bool) Snapshot {
+	if h == nil {
+		return Snapshot{}
+	}
+
+	h.mu.RLock()
+	address := ""
+	if len(h.Targets) > 0 {
+		address = h.Targets[0]
+	}
+	view := Snapshot{
+		TTL:       h.TTL,
+		Address:   address,
+		Sent:      h.Sent,
+		Lost:      h.Lost,
+		Loss:      h.Loss(),
+		LastMS:    h.Last.Elapsed.Seconds() * 1000,
+		BestMS:    h.Best.Elapsed.Seconds() * 1000,
+		AverageMS: h.Avg(),
+		WorstMS:   h.Worst.Elapsed.Seconds() * 1000,
+	}
+	h.mu.RUnlock()
+
+	target, asnStr, locationStr := h.ResolveTarget(address, ptrLookup)
+	view.Target = target
+	view.ASN = asnStr
+	view.Location = locationStr
+	return view
+}
+
+// ResolveTarget uses the per-hop caches without reading mutable statistics.
+// Callers can pass an address captured under their own statistics lock.
+func (h *HopStatistic) ResolveTarget(address string, ptrLookup bool) (string, string, string) {
+	target := address
+	if address == "" {
+		if h.Lang == "zh" {
+			target = "请求超时"
+		} else {
+			target = "Request timed out"
+		}
+	} else if ptrLookup {
+		target = h.lookupAddrForTarget(address)
+	}
+	asnStr, locationStr := h.lookupMetadataForIP(address)
+	return target, asnStr, locationStr
+}
+
+// SnapshotWithMetadata builds a view from already captured values and avoids
+// performing any external lookup.
+func (h *HopStatistic) SnapshotWithMetadata(address, target, asnStr, locationStr string) Snapshot {
+	if h == nil {
+		return Snapshot{}
+	}
+	h.mu.RLock()
+	view := Snapshot{
+		TTL:       h.TTL,
+		Address:   address,
+		Target:    target,
+		Sent:      h.Sent,
+		Lost:      h.Lost,
+		Loss:      h.Loss(),
+		LastMS:    h.Last.Elapsed.Seconds() * 1000,
+		BestMS:    h.Best.Elapsed.Seconds() * 1000,
+		AverageMS: h.Avg(),
+		WorstMS:   h.Worst.Elapsed.Seconds() * 1000,
+		ASN:       asnStr,
+		Location:  locationStr,
+	}
+	h.mu.RUnlock()
+	return view
 }
 
 func (h *HopStatistic) MarshalJSON() ([]byte, error) {
@@ -200,11 +357,12 @@ func rightPadString(s string, width int) string {
 	return strings.Repeat(" ", padding) + s
 }
 
-func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int, ttl int) {
+func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int, ttl int) string {
 	if h == nil {
-		gm.Println("nil HopStatistic")
-		return
+		return ""
 	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	maxLength := width - 1
 
 	// Determine column format, adjust DESTINATION column width based on IPv4/IPv6
@@ -283,45 +441,10 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int, ttl int)
 	loss = rightPadString(fmt.Sprintf("%.0f", h.Loss()), lossWidth)
 	sent = rightPadString(fmt.Sprintf("%d", h.Sent), sentWidth)
 
-	// Get ASN information
-	var asnStr string
-	if h.Asns != nil && h.Targets != nil && len(h.Targets) > 0 && h.Targets[0] != "" {
-		if a, err := h.Asns.LookupByIP(h.Targets[0]); err == nil && a != nil && a.Number != "AS0" {
-			asnStr = a.Number
-		} else {
-			asnStr = "- -"
-		}
-	} else {
-		asnStr = "- -"
-	}
+	// ASN and location lookups are cached per hop/IP. Rendering is frequent,
+	// while the underlying database/DNS lookups are not free.
+	asnStr, locationStr := h.lookupMetadataForTarget()
 	asnStr = padString(asnStr, asnWidth)
-
-	// Get LOCATION information
-	var locationStr string
-	if h.Targets != nil && len(h.Targets) > 0 && h.Targets[0] != "" {
-		if h.GeoIP != nil {
-			if loc, err := h.GeoIP.LookupByIP(h.Targets[0], h.Lang, h.UseQQWry, h.Asns); err == nil && loc != nil {
-				locationStr = loc.Format(h.Lang)
-			} else {
-				locationStr = "- -"
-			}
-		} else if h.Asns != nil {
-			// If no GeoIP but have ASN data, also try to get location information
-			if a, err := h.Asns.LookupByIP(h.Targets[0]); err == nil && a != nil && a.Country != "" {
-				parts := []string{a.Country}
-				if a.Description != "" {
-					parts = append(parts, a.Description)
-				}
-				locationStr = strings.Join(parts, " ")
-			} else {
-				locationStr = "- -"
-			}
-		} else {
-			locationStr = "- -"
-		}
-	} else {
-		locationStr = "- -"
-	}
 
 	// Safely truncate location information to fit column width, avoid breaking multi-byte characters
 	if getStringDisplayWidth(locationStr) > locationWidth {
@@ -347,28 +470,90 @@ func (h *HopStatistic) Render(ptrLookup bool, width int, destWidth int, ttl int)
 	if getStringDisplayWidth(line) > maxLength {
 		line = truncateString(line, maxLength)
 	}
-	// BUGFIX: use fmt.Printf instead of gm.Printf due to gm.Printf will skip some lines
-	fmt.Printf("%s\n", line)
+	return line
 }
 
 func (h *HopStatistic) lookupAddr(ptrLookup bool, index int) string {
-	addr := "???"
-	if h.Targets[index] != "" {
-		addr = h.Targets[index]
-		if ptrLookup {
-			if h.dnsCache == nil {
-				h.dnsCache = map[string]string{}
-			}
-			if key, ok := h.dnsCache[h.Targets[index]]; ok {
-				addr = key
-			} else {
-				names, err := net.LookupAddr(h.Targets[index])
-				if err == nil && len(names) > 0 {
-					addr = names[0]
-				}
-			}
-			h.dnsCache[h.Targets[index]] = addr
+	if index < 0 || index >= len(h.Targets) || h.Targets[index] == "" {
+		return "???"
+	}
+	if !ptrLookup {
+		return h.Targets[index]
+	}
+	return h.lookupAddrForTarget(h.Targets[index])
+}
+
+func (h *HopStatistic) lookupAddrForTarget(addr string) string {
+	if addr == "" {
+		return "???"
+	}
+	h.cacheMu.Lock()
+	if h.dnsCache != nil {
+		if cached, ok := h.dnsCache[addr]; ok {
+			h.cacheMu.Unlock()
+			return cached
 		}
 	}
-	return addr
+	h.cacheMu.Unlock()
+
+	resolved := addr
+	if names, err := net.LookupAddr(addr); err == nil && len(names) > 0 {
+		resolved = names[0]
+	}
+	h.cacheMu.Lock()
+	if h.dnsCache == nil {
+		h.dnsCache = make(map[string]string)
+	}
+	h.dnsCache[addr] = resolved
+	h.cacheMu.Unlock()
+	return resolved
+}
+
+func (h *HopStatistic) lookupMetadataForTarget() (string, string) {
+	if len(h.Targets) == 0 {
+		return "- -", "- -"
+	}
+	return h.lookupMetadataForIP(h.Targets[0])
+}
+
+func (h *HopStatistic) lookupMetadataForIP(target string) (string, string) {
+	if target == "" {
+		return "- -", "- -"
+	}
+	h.cacheMu.Lock()
+	if cached, ok := h.lookupCache[target]; ok {
+		h.cacheMu.Unlock()
+		return cached.asn, cached.location
+	}
+	h.cacheMu.Unlock()
+
+	asnStr := "- -"
+	locationStr := "- -"
+	if h.Asns != nil {
+		if a, err := h.Asns.LookupByIP(target); err == nil && a != nil {
+			if a.Number != "" && a.Number != "AS0" {
+				asnStr = a.Number
+			}
+			if h.GeoIP == nil && a.Country != "" {
+				parts := []string{a.Country}
+				if a.Description != "" {
+					parts = append(parts, a.Description)
+				}
+				locationStr = strings.Join(parts, " ")
+			}
+		}
+	}
+	if h.GeoIP != nil {
+		if loc, err := h.GeoIP.LookupByIP(target, h.Lang, h.UseQQWry, h.Asns); err == nil && loc != nil {
+			locationStr = loc.Format(h.Lang)
+		}
+	}
+
+	h.cacheMu.Lock()
+	if h.lookupCache == nil {
+		h.lookupCache = make(map[string]lookupMetadata)
+	}
+	h.lookupCache[target] = lookupMetadata{asn: asnStr, location: locationStr}
+	h.cacheMu.Unlock()
+	return asnStr, locationStr
 }

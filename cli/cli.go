@@ -3,26 +3,23 @@ package cli
 import (
 	"fmt"
 	"os"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/moeart/ntr/pkg/asn"
 	"github.com/moeart/ntr/pkg/config"
 	"github.com/moeart/ntr/pkg/geoip"
 	"github.com/moeart/ntr/pkg/ntr"
-	"github.com/moeart/ntr/pkg/render"
+	"github.com/moeart/ntr/pkg/tui"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 var (
-	version string
-	date    string
+	version = "6.0.2026.0820"
+	date    = "2026-08-20"
 
 	COUNT            = 5
 	TIMEOUT          = 1000 * time.Millisecond
-	INTERVAL         = 200 * time.Millisecond
+	INTERVAL         = 1 * time.Second
 	HOP_SLEEP        = time.Nanosecond
 	MAX_HOPS         = 25
 	MAX_UNKNOWN_HOPS = 10
@@ -85,6 +82,43 @@ var RootCmd = &cobra.Command{
 			return fmt.Errorf("Failed to load configuration: %v", err)
 		}
 
+		// Apply configuration values unless the corresponding command-line flag
+		// was explicitly supplied. This keeps CLI arguments authoritative while
+		// making config.yaml actually control the runtime.
+		flags := cmd.Flags()
+		if !flags.Changed("timeout") {
+			TIMEOUT = cfg.Network.Timeout
+		}
+		if !flags.Changed("interval") {
+			INTERVAL = cfg.Network.Interval
+		}
+		if !flags.Changed("max-hop") {
+			MAX_HOPS = cfg.Network.MaxHops
+		}
+		if !flags.Changed("lang") {
+			LANG = cfg.GetLanguage()
+		}
+		PTR_LOOKUP = cfg.Display.PTRLookup
+		RING_BUFFER_SIZE = cfg.Display.RingBufferSize
+		HOP_SLEEP = cfg.Network.HopSleep
+		MAX_UNKNOWN_HOPS = cfg.Network.MaxUnknownHops
+
+		if TIMEOUT <= 0 {
+			return fmt.Errorf("timeout must be greater than zero")
+		}
+		if INTERVAL <= 0 {
+			return fmt.Errorf("interval must be greater than zero")
+		}
+		if MAX_HOPS < 1 || MAX_HOPS > 255 {
+			return fmt.Errorf("max-hop must be between 1 and 255")
+		}
+		if MAX_UNKNOWN_HOPS < 0 {
+			return fmt.Errorf("max unknown hops cannot be negative")
+		}
+		if RING_BUFFER_SIZE < 1 {
+			return fmt.Errorf("ring buffer size must be greater than zero")
+		}
+
 		// Handle --update-asn parameter
 		if UPDATE_ASN {
 			fmt.Println("Updating ASN database...")
@@ -105,13 +139,9 @@ var RootCmd = &cobra.Command{
 			return nil
 		}
 
-		// Detect timezone to determine whether to use QQWry
-		useQQWry := true
-		zone, _ := time.Now().Zone()
-		// Chinese timezone usually contains "CST" (China Standard Time)
-		if !strings.Contains(strings.ToUpper(zone), "CST") || LANG == "en" {
-			useQQWry = false
-		}
+		// QQWry selection is configuration-driven. Inferring it from the host
+		// timezone disabled the database unexpectedly on UTC servers.
+		useQQWry := cfg.UseQQWry() && LANG != "en"
 
 		// Set IP protocol preference according to configuration (if not specified by command line parameters)
 		if !forceIPv4 && !forceIPv6 {
@@ -129,89 +159,28 @@ var RootCmd = &cobra.Command{
 			return fmt.Errorf("cannot use both -4 and -6 options at the same time")
 		}
 
+		disableASN, _ := flags.GetBool("disable-asn")
+		disableGeoIP, _ := flags.GetBool("disable-geoip")
+		enableASN := cfg.IsASNEnabled() && !disableASN
+		enableGeoIP := cfg.IsGeoIPEnabled() && !disableGeoIP
+
 		m, ch, err := ntr.NewNTR(args[0], srcAddr, TIMEOUT, INTERVAL, HOP_SLEEP,
-			MAX_HOPS, MAX_UNKNOWN_HOPS, RING_BUFFER_SIZE, PTR_LOOKUP, ENABLE_ASN, ENABLE_GEOIP, LANG, useQQWry, forceIPv4, forceIPv6)
+			MAX_HOPS, MAX_UNKNOWN_HOPS, RING_BUFFER_SIZE, PTR_LOOKUP, enableASN, enableGeoIP, LANG, useQQWry, forceIPv4, forceIPv6)
 		if err != nil {
 			return err
 		}
 
-		mu := &sync.Mutex{}
+		ui := tui.New(m)
+		go m.Run(ch, COUNT)
 
-		// 设置优雅退出处理器
-		shutdownRequested := false
-		shutdownMutex := &sync.Mutex{}
-		var terminalState *term.State
-
-		cleanupFunc := func() {
-			shutdownMutex.Lock()
-			if shutdownRequested {
-				shutdownMutex.Unlock()
-				return
-			}
-			shutdownRequested = true
-			shutdownMutex.Unlock()
-
-			// 清除屏幕
-			render.ClearScreen()
-			// 恢复终端状态
-			if terminalState != nil {
-				term.Restore(int(os.Stdin.Fd()), terminalState)
-			}
+		// tview owns raw mode, resize handling, alternate-screen rendering and
+		// key dispatch. This removes the old competing stdin reader and manual
+		// cursor/flush loop.
+		if err := ui.Run(); err != nil {
+			m.Stop()
+			return fmt.Errorf("TUI stopped with error: %w", err)
 		}
-
-		// 设置中断信号处理器
-		render.SetupInterruptHandler(cleanupFunc)
-
-		// 设置终端原始模式以捕获按键
-		terminalState, err = term.MakeRaw(int(os.Stdin.Fd()))
-		if err == nil {
-			// 启动键盘监听
-			go func() {
-				buf := make([]byte, 1)
-				for {
-					n, err := os.Stdin.Read(buf)
-					if err != nil || n == 0 {
-						return
-					}
-
-					key := buf[0]
-					// 检查 q, Q, esc (27), ctrl+c (3)
-					if key == 'q' || key == 'Q' || key == 27 || key == 3 {
-						cleanupFunc()
-						os.Exit(0)
-					}
-				}
-			}()
-		}
-
-		// Start window size change monitoring
-		go render.WatchWindowSize()
-
-		// Handle network updates and window size changes
-		go func(ch chan struct{}) {
-			for {
-				select {
-				case <-ch:
-					mu.Lock()
-					render.MoveCursor(1, 1)
-					m.Render()
-					render.Flush()
-					mu.Unlock()
-				case <-render.GetResizeChan():
-					mu.Lock()
-					render.MoveCursor(1, 1)
-					m.Render()
-					render.Flush()
-					mu.Unlock()
-				}
-			}
-		}(ch)
-
-		// 运行 traceroute
-		m.Run(ch, COUNT)
-
-		// 正常完成时的清理
-		cleanupFunc()
+		m.Stop()
 		return nil
 	},
 }
@@ -275,7 +244,7 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.
 		}
 	}
 
-	RootCmd.Flags().DurationVarP(&INTERVAL, "interval", "i", INTERVAL, "Seconds between each traceroute. (min:1)")
+	RootCmd.Flags().DurationVarP(&INTERVAL, "interval", "i", INTERVAL, "Seconds between each traceroute (default 1s).")
 	// Add IPv4 and IPv6 options
 	RootCmd.Flags().BoolVarP(&forceIPv4, "ipv4", "4", false, "Force using IPv4 protocol")
 	RootCmd.Flags().BoolVarP(&forceIPv6, "ipv6", "6", false, "Force using IPv6 protocol")

@@ -88,7 +88,7 @@ Flags:
   -a, --disable-asn         Disable IP to BGP AS number query.
   -g, --disable-geoip       Disable IP to geographic location query.
   -h, --help                help for ntr
-  -i, --interval duration   Seconds between each traceroute. (min:1) (default 200ms)
+  -i, --interval duration   Seconds between each traceroute (default 1s).
   -4, --ipv4                Force using IPv4 protocol
   -6, --ipv6                Force using IPv6 protocol
   -L, --lang string         Set language (zh for Chinese, en for English) (default "zh")

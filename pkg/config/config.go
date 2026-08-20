@@ -65,7 +65,7 @@ func GetDefaultConfig() *Config {
 			MaxHops:        25,
 			MaxUnknownHops: 10,
 			Timeout:        1000 * time.Millisecond,
-			Interval:       200 * time.Millisecond,
+			Interval:       1 * time.Second,
 			HopSleep:       0 * time.Millisecond,
 		},
 		Display: DisplayConfig{
